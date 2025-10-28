@@ -1,5 +1,11 @@
 # flowershow
 
+## 3.0.4
+
+### Patch Changes
+
+- Fix bug #30 (Broken single file publish due to incorrect branch names used.)
+
 ## 3.0.3
 
 ### Patch Changes

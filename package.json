@@ -1,6 +1,6 @@
 {
     "name": "flowershow",
-    "version": "3.0.3",
+    "version": "3.0.4",
     "description": "Obsidian Flowershow plugin for publishing with Flowershow direct from your obsidian vault.",
     "main": "main.js",
     "scripts": {
@@ -35,6 +35,7 @@
         "@octokit/rest": "^22.0.0",
         "@sindresorhus/slugify": "^3.0.0",
         "axios": "^1.12.2",
+        "github-slugger": "^2.0.0",
         "luxon": "^3.7.2",
         "react": "^19.2.0",
         "react-dom": "^19.2.0"

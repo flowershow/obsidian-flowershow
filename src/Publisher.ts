@@ -4,6 +4,7 @@ import { Octokit } from "@octokit/rest";
 import { validatePublishFrontmatter, validateSettings } from "./Validator";
 import { detectGitAlgoFromSha, FlowershowError, gitBlobOidFromBinary, gitBlobOidFromText, isPlainTextExtension } from "./utils";
 import PublishStatusBar from "./PublishStatusBar";
+import { slug } from "github-slugger";
 
 export interface PublishStatus {
     unchangedFiles: Array<TFile>;
@@ -174,7 +175,7 @@ export default class Publisher {
       // Create PR with all files
       return await this.publishBatch({
         filesToPublish,
-        branchNameHint: `publish-${this.normalizePath(file.path).replace(/\//g, '-')}`
+        branchNameHint: `publish-${slug(file.name)}`
       });
     }
 
@@ -286,7 +287,7 @@ export default class Publisher {
   async publishBatch(opts: {
     filesToPublish?: TFile[];
     filesToDelete?: string[];
-    branchNameHint?: string; // optional custom branch name
+    branchNameHint?: string; // optional custom branch name, note: needs to be a valid ref, so e.g. no special signs or spaces
   }): Promise<{ branch: string; prNumber: number; prUrl: string; merged: boolean }> {
     if (!validateSettings(this.settings)) {
       throw new FlowershowError("Invalid Flowershow GitHub settings");
@@ -304,6 +305,7 @@ export default class Publisher {
     const owner = this.settings.githubUserName;
     const repo = this.settings.githubRepo;
     const baseBranch = (this.settings.branch?.trim() || "main");
+
     const workBranch = await this.createWorkingBranch(baseBranch, opts.branchNameHint);
 
     const filesToPublish = opts.filesToPublish ?? [];
@@ -531,7 +533,7 @@ export default class Publisher {
     }).then(r => r.data);
 
     // Find a unique branch name
-    const baseName = desiredName?.trim() || `flowershow/publish-${Date.now()}`;
+    const baseName = desiredName || `flowershow/publish-${Date.now()}`;
     let branchName = baseName;
     let i = 1;
     while (true) {
