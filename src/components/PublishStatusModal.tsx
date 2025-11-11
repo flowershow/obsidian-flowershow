@@ -92,6 +92,7 @@ interface SectionProps {
   onButtonClick?: () => Promise<void>;
   selectedItems?: string[];
   onSelectionChange?: (ids: (string | number)[]) => void;
+  defaultCollapsed?: boolean;
 }
 
 const Section: React.FC<SectionProps> = ({
@@ -103,7 +104,9 @@ const Section: React.FC<SectionProps> = ({
   onButtonClick,
   selectedItems = [],
   onSelectionChange,
+  defaultCollapsed = false,
 }) => {
+  const [isCollapsed, setIsCollapsed] = React.useState(defaultCollapsed);
   const fileTree = React.useMemo(() => buildFileTree(items), [items]);
 
   // Collect a set of *file* IDs so we can filter selections
@@ -131,8 +134,13 @@ const Section: React.FC<SectionProps> = ({
 
   return (
     <div className="header-container" style={{ marginBottom: '8px' }}>
-      <div className="title-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h3 style={{ fontSize: '1em', margin: 0 }}>
+      <div
+        className="title-container"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+        onClick={() => setIsCollapsed(!isCollapsed)}
+      >
+        <h3 style={{ fontSize: '1em', margin: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span style={{ fontSize: '0.8em' }}>{isCollapsed ? '▶' : '▼'}</span>
           {title}
           <span className="count">({count} files)</span>
         </h3>
@@ -152,7 +160,7 @@ const Section: React.FC<SectionProps> = ({
         )}
       </div>
 
-      {loading ? <div style={{ padding: '0 10px', color: 'var(--text-muted)' }}>Loading...</div> : (
+      {!isCollapsed && (loading ? <div style={{ padding: '0 10px', color: 'var(--text-muted)' }}>Loading...</div> : (
         <RichTreeView
           aria-label={`${title} files`}
           items={fileTree}
@@ -172,7 +180,7 @@ const Section: React.FC<SectionProps> = ({
           slots={{ item: CustomTreeItem }}
           sx={{ flexGrow: 1, maxWidth: '100%', color: 'var(--text-normal)' }}
         />
-      )}
+      ))}
     </div>
   );
 };
@@ -422,6 +430,7 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
           onSelectionChange={(ids) =>
             setSelectedBySection((s) => ({ ...s, Unchanged: ids as string[] }))
           }
+          defaultCollapsed={true}
         />
       </div>
 
