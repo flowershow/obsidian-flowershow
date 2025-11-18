@@ -48,50 +48,199 @@ export default class Publisher {
     if (!validateSettings(this.settings)) {
       return {
         success: false,
-        message: "Please fill in all GitHub settings (username, repository, token, branch).",
+        message:
+          "Please fill in all GitHub settings (username, repository, token, branch).",
       };
     }
 
-    const owner = this.settings.githubUserName;
-    const repo = this.settings.githubRepo;
+    const owner = this.settings.githubUserName.trim();
+    const repo = this.settings.githubRepo.trim();
     const branch = this.settings.branch?.trim() || "main";
+    const token = this.settings.githubToken?.trim() ?? "";
+    const tokenType = getTokenType(token);
 
     try {
-      // Repo exists & we can read it
+      //
+      // 1. For classic tokens: check scopes via x-oauth-scopes
+      //
+      if (tokenType === "classic") {
+        try {
+          const userResp = await this.octokit.request("GET /user");
+          const scopesHeader = userResp.headers["x-oauth-scopes"];
+          const scopes =
+            typeof scopesHeader === "string"
+              ? scopesHeader
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+              : [];
+
+          if (!scopes.includes("repo")) {
+            return {
+              success: false,
+              message:
+                "Connected, but your personal access token (classic) is missing the 'repo' scope. " +
+                "Edit the token on GitHub and enable the full 'repo' scope (or create a new token).",
+            };
+          }
+        } catch (scopeError: any) {
+          // Missing read:user or other oddities – don't fail the whole test.
+          console.warn("Warning: Could not verify classic token scopes:", scopeError);
+        }
+      }
+
+      //
+      // 2. Repo exists & user can see it
+      //
       const { data: repoData } = await this.octokit.repos.get({ owner, repo });
 
-      // Check push permission
-      const canPush =
+      // This is user-level permission (their membership), still useful feedback.
+      const canPushByRole =
         repoData.permissions?.push ||
         repoData.permissions?.admin ||
         repoData.permissions?.maintain;
-      if (!canPush) {
-        return {
-          success: false,
-          message: "Connected, but you don't have write access to this repository.",
-        };
-      }
 
-      // Branch exists
-      await this.octokit.repos.getBranch({ owner, repo, branch });
-
-      return {
-        success: true,
-        message: `Connected. Repo "${owner}/${repo}" and branch "${branch}" are accessible with write permission.`,
-      };
-    } catch (error: any) {
-      const status = error?.status;
-      if (status === 404)
-        return { success: false, message: "Repository or branch not found." };
-      if (status === 401)
-        return { success: false, message: "Authentication failed. Check your token." };
-      if (status === 403)
+      if (!canPushByRole) {
         return {
           success: false,
           message:
-            "Access denied (403). Check repository permissions or token scopes (need 'repo').",
+            "Connected, but your GitHub account only has read access to this repository. " +
+            "You need write (push) access on the repo itself to publish.",
         };
-      return { success: false, message: `Connection failed: ${error?.message ?? error}` };
+      }
+
+      //
+      // 3. Branch exists
+      //
+      await this.octokit.repos.getBranch({ owner, repo, branch });
+
+      //
+      // 4. For fine-grained tokens: *actual* write-permission probe
+      //
+      if (tokenType === "fine-grained") {
+        const writeCheck = await checkFineGrainedWriteAccess(
+          this.octokit,
+          owner,
+          repo,
+        );
+
+        if (!writeCheck.ok) {
+          return {
+            success: false,
+            message: writeCheck.message ?? "Fine-grained token lacks write access.",
+          };
+        }
+      }
+
+      //
+      // 5. Pull request visibility check (read-level, but catches obvious PR permission issues)
+      //
+      try {
+        await this.octokit.rest.pulls.list({
+          owner,
+          repo,
+          state: "open",
+          per_page: 1,
+        });
+      } catch (prError: any) {
+        const status = prError?.status;
+        const acceptedPerms = prError?.response?.headers?.[
+          "x-accepted-github-permissions"
+        ] as string | undefined;
+
+        if (status === 403) {
+          if (acceptedPerms) {
+            return {
+              success: false,
+              message:
+                "Connected to the repository, but your token cannot access pull requests.\n\n" +
+                `GitHub reports these required permissions: ${acceptedPerms}\n\n` +
+                (tokenType === "fine-grained"
+                  ? "For fine-grained tokens, make sure it has at least:\n" +
+                    "- Repository: Contents (Read and write)\n" +
+                    "- Repository: Metadata (Read)\n" +
+                    "- Repository: Pull requests (Read and write)\n"
+                  : "For classic tokens, ensure the token includes the 'repo' scope (which covers pull requests)."),
+            };
+          }
+
+          return {
+            success: false,
+            message:
+              "Connected, but unable to access pull requests (403).\n" +
+              (tokenType === "fine-grained"
+                ? "For fine-grained tokens, enable 'Contents' and 'Pull requests' permissions for this repo."
+                : "For classic tokens, ensure the token includes the 'repo' scope."),
+          };
+        }
+
+        console.warn("Warning: Could not verify pull request permissions:", prError);
+      }
+
+      //
+      // 6. Success
+      //
+      const tokenInfo =
+        tokenType === "classic"
+          ? "Classic token detected."
+          : tokenType === "fine-grained"
+          ? "Fine-grained token detected."
+          : "Token type could not be determined (non-standard prefix).";
+
+      return {
+        success: true,
+        message: "Connected to the repo with required permissions."
+      };
+    } catch (error: any) {
+      const status = error?.status;
+      const acceptedPerms = error?.response?.headers?.[
+        "x-accepted-github-permissions"
+      ] as string | undefined;
+
+      if (status === 404) {
+        return {
+          success: false,
+          message:
+            "Repository or branch not found. " +
+            `Make sure "${owner}/${repo}" exists and the branch "${branch}" is correct.`,
+        };
+      }
+
+      if (status === 401) {
+        return {
+          success: false,
+          message:
+            "Authentication failed (401). Check your personal access token and make sure it is valid.",
+        };
+      }
+
+      if (status === 403) {
+        if (acceptedPerms) {
+          return {
+            success: false,
+            message:
+              "Access denied (403). Your token or account is missing required permissions.\n\n" +
+              `GitHub reports these required permissions: ${acceptedPerms}\n\n` +
+              (tokenType === "fine-grained"
+                ? "For fine-grained tokens, adjust the token to include the listed repository permissions for this repo."
+                : "For classic tokens, ensure it has the 'repo' scope and access to this repository."),
+          };
+        }
+
+        return {
+          success: false,
+          message:
+            "Access denied (403). Check repository permissions and token scopes.\n" +
+            (tokenType === "fine-grained"
+              ? "For fine-grained tokens, make sure the repository is selected and that it has Contents (Read and write) and Pull requests permissions."
+              : "For classic tokens, ensure the token includes the 'repo' scope."),
+        };
+      }
+
+      return {
+        success: false,
+        message: `Connection failed: ${error?.message ?? String(error)}`,
+      };
     }
   }
 
@@ -649,5 +798,75 @@ export default class Publisher {
         return { prNumber, prUrl, merged: false };
       }
     }
+  }
+}
+
+type TokenType = "classic" | "fine-grained" | "unknown";
+
+function getTokenType(token: string | undefined | null): TokenType {
+  if (!token) return "unknown";
+  const t = token.trim();
+  if (t.startsWith("github_pat_")) return "fine-grained";
+  if (t.startsWith("ghp_")) return "classic";
+  return "unknown";
+}
+
+
+/**
+ * For fine-grained tokens, actually probe write access by creating
+ * a Git blob. This requires write permission to repo contents.
+ *
+ * It doesn't create commits or files in the tree – just an unreachable
+ * blob object, which is harmless.
+ */
+async function checkFineGrainedWriteAccess(
+  octokit: any,
+  owner: string,
+  repo: string,
+): Promise<{ ok: boolean; message?: string }> {
+  try {
+    await octokit.git.createBlob({
+      owner,
+      repo,
+      content: "flowershow-permission-check",
+      encoding: "utf-8",
+    });
+
+    // If we get here, the token could create a blob => has write to contents.
+    return { ok: true };
+  } catch (error: any) {
+    const status = error?.status;
+    const acceptedPerms = error?.response?.headers?.[
+      "x-accepted-github-permissions"
+    ] as string | undefined;
+
+    if (status === 401 || status === 403) {
+      let message =
+        "Connected to the repository, but your fine-grained token does not have write access to repository contents.";
+
+      if (acceptedPerms) {
+        message +=
+          "\n\nGitHub reports these required permissions: " +
+          acceptedPerms +
+          "\n\n" +
+          "When editing the token, make sure it has at least:\n" +
+          "- Repository: Contents (Read and write)\n" +
+          "- Repository: Metadata (Read)\n";
+      } else {
+        message +=
+          "\n\nFor fine-grained tokens, ensure that:\n" +
+          "- This repository is selected in the token settings, and\n" +
+          "- 'Contents' is set to 'Read and write'.";
+      }
+
+      return { ok: false, message };
+    }
+
+    // Any other error: treat as inconclusive but don't hard-fail connection.
+    console.warn(
+      "Warning: Could not conclusively verify write access for fine-grained token:",
+      error,
+    );
+    return { ok: true };
   }
 }

@@ -1,5 +1,11 @@
 # flowershow
 
+## 3.0.7
+
+### Patch Changes
+
+- Fixed incorrect "Test connection" button message for fine-grained tokens.
+
 ## 3.0.6
 
 ### Patch Changes

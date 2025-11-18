@@ -100,12 +100,18 @@ export default class SettingView {
   private initializeGitHubTokenSetting() {
       const desc = document.createDocumentFragment();
       desc.createEl("span", undefined, (span) => {
-          span.innerText =
-              "GitHub personal access token with repository permissions. You can generate one ";
+          span.appendText("GitHub personal access token with repository permissions. You can generate one ");
           span.createEl("a", undefined, (link) => {
               link.href = "https://github.com/settings/tokens/new?scopes=repo";
               link.innerText = "here!";
           });
+          span.createEl("br");
+          span.createEl("br");
+          span.createEl("strong", { text: "Required scopes:" });
+          span.createEl("br");
+          span.appendText("• Classic PAT: repo scope");
+          span.createEl("br");
+          span.appendText("• Fine-grained PAT: Contents and Pull Requests (both with read and write)");
       });
 
       new Setting(this.settingsRootElement)
@@ -135,7 +141,7 @@ export default class SettingView {
                       if (result.success) {
                           new Notice('✅ ' + result.message, 4000);
                       } else {
-                          new Notice('❌ ' + result.message, 4000);
+                          new Notice('❌ ' + result.message, 10000);
                       }
                   } catch (error) {
                       new Notice('❌ Failed to test connection', 4000);
