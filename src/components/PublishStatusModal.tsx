@@ -1,22 +1,34 @@
-import * as React from 'react';
-import { createRoot } from 'react-dom/client';
-import { App, Modal, Notice, TFile } from 'obsidian';
+import * as React from "react";
+import { createRoot } from "react-dom/client";
+import { App, Modal, Notice, TFile } from "obsidian";
 
-import type { IFlowershowSettings } from '../settings';
-import type { PublishStatus } from '../Publisher';
-import Publisher from '../Publisher';
+import type { IFlowershowSettings } from "../settings";
+import type { PublishStatus } from "../Publisher";
+import Publisher from "../Publisher";
 
-import { RichTreeView } from '@mui/x-tree-view/RichTreeView';
-import { TreeItemDragAndDropOverlay, TreeViewBaseItem, UseTreeItemParameters } from '@mui/x-tree-view';
-import FolderRoundedIcon from '@mui/icons-material/FolderRounded';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
-import { useTreeItem } from '@mui/x-tree-view/useTreeItem';
-import { TreeItemProvider } from '@mui/x-tree-view/TreeItemProvider';
-import { TreeItemIcon } from '@mui/x-tree-view/TreeItemIcon';
-import { TreeItemIconContainer, TreeItemCheckbox, TreeItemLabel, TreeItemRoot, TreeItemContent, TreeItemGroupTransition, treeItemClasses } from '@mui/x-tree-view/TreeItem';
-import { styled } from '@mui/material/styles';
-import { Box } from '@mui/material';
-import { FlowershowError } from 'src/utils';
+import { RichTreeView } from "@mui/x-tree-view/RichTreeView";
+import {
+  TreeItemDragAndDropOverlay,
+  TreeViewBaseItem,
+  UseTreeItemParameters,
+} from "@mui/x-tree-view";
+import FolderRoundedIcon from "@mui/icons-material/FolderRounded";
+import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
+import { useTreeItem } from "@mui/x-tree-view/useTreeItem";
+import { TreeItemProvider } from "@mui/x-tree-view/TreeItemProvider";
+import { TreeItemIcon } from "@mui/x-tree-view/TreeItemIcon";
+import {
+  TreeItemIconContainer,
+  TreeItemCheckbox,
+  TreeItemLabel,
+  TreeItemRoot,
+  TreeItemContent,
+  TreeItemGroupTransition,
+  treeItemClasses,
+} from "@mui/x-tree-view/TreeItem";
+import { styled } from "@mui/material/styles";
+import { Box } from "@mui/material";
+import { FlowershowError } from "src/utils";
 
 interface PublishStatusModalProps {
   app: App;
@@ -32,16 +44,18 @@ type ExtendedTreeItemProps = {
   label: string;
 };
 
-function buildFileTree(items: Array<TFile | string>): TreeViewBaseItem<ExtendedTreeItemProps>[] {
+function buildFileTree(
+  items: Array<TFile | string>,
+): TreeViewBaseItem<ExtendedTreeItemProps>[] {
   const nodeMap = new Map<string, TreeViewBaseItem<ExtendedTreeItemProps>>();
 
   items.forEach((item) => {
     const path = item instanceof TFile ? item.path : item;
-    const parts = path.split('/');
+    const parts = path.split("/");
 
     parts.forEach((part, i) => {
-      const currentPath = parts.slice(0, i + 1).join('/');
-      const parentPath = parts.slice(0, i).join('/');
+      const currentPath = parts.slice(0, i + 1).join("/");
+      const parentPath = parts.slice(0, i).join("/");
       const isLastPart = i === parts.length - 1;
 
       if (!nodeMap.has(currentPath)) {
@@ -49,7 +63,7 @@ function buildFileTree(items: Array<TFile | string>): TreeViewBaseItem<ExtendedT
           id: currentPath,
           label: part,
           children: [],
-          nodeType: isLastPart ? 'file' : 'folder', // ✅ set nodeType
+          nodeType: isLastPart ? "file" : "folder", // ✅ set nodeType
         });
       }
 
@@ -67,16 +81,22 @@ function buildFileTree(items: Array<TFile | string>): TreeViewBaseItem<ExtendedT
     });
   });
 
-  const rootNodes = Array.from(nodeMap.values()).filter((node) => !node.id.includes('/'));
+  const rootNodes = Array.from(nodeMap.values()).filter(
+    (node) => !node.id.includes("/"),
+  );
 
-  const sortNodes = (nodes: TreeViewBaseItem<ExtendedTreeItemProps>[]): TreeViewBaseItem<ExtendedTreeItemProps>[] =>
+  const sortNodes = (
+    nodes: TreeViewBaseItem<ExtendedTreeItemProps>[],
+  ): TreeViewBaseItem<ExtendedTreeItemProps>[] =>
     nodes
       .sort((a, b) => a.label.localeCompare(b.label))
       .map((node) => ({
         ...node,
         children:
           node.children && node.children.length > 0
-            ? sortNodes(node.children as TreeViewBaseItem<ExtendedTreeItemProps>[])
+            ? sortNodes(
+                node.children as TreeViewBaseItem<ExtendedTreeItemProps>[],
+              )
             : undefined,
       }));
 
@@ -114,7 +134,9 @@ const Section: React.FC<SectionProps> = ({
     const set = new Set<string>();
     const visit = (nodes: TreeViewBaseItem<ExtendedTreeItemProps>[]) => {
       for (const n of nodes) {
-        if ((n as TreeViewBaseItem<ExtendedTreeItemProps>).nodeType === 'file') {
+        if (
+          (n as TreeViewBaseItem<ExtendedTreeItemProps>).nodeType === "file"
+        ) {
           set.add(String(n.id));
         }
         if (n.children && n.children.length) {
@@ -129,18 +151,31 @@ const Section: React.FC<SectionProps> = ({
   // Ensure the controlled selectedItems are files-only
   const selectedFileItems = React.useMemo(
     () => (selectedItems || []).filter((id) => fileIdSet.has(String(id))),
-    [selectedItems, fileIdSet]
+    [selectedItems, fileIdSet],
   );
 
   return (
-    <div className="header-container" style={{ marginBottom: '8px' }}>
+    <div className="header-container" style={{ marginBottom: "8px" }}>
       <div
         className="title-container"
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          cursor: "pointer",
+        }}
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
-        <h3 style={{ fontSize: '1em', margin: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <span style={{ fontSize: '0.8em' }}>{isCollapsed ? '▶' : '▼'}</span>
+        <h3
+          style={{
+            fontSize: "1em",
+            margin: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+          }}
+        >
+          <span style={{ fontSize: "0.8em" }}>{isCollapsed ? "▶" : "▼"}</span>
           {title}
           <span className="count">({count} files)</span>
         </h3>
@@ -160,27 +195,32 @@ const Section: React.FC<SectionProps> = ({
         )}
       </div>
 
-      {!isCollapsed && (loading ? <div style={{ padding: '0 10px', color: 'var(--text-muted)' }}>Loading...</div> : (
-        <RichTreeView
-          aria-label={`${title} files`}
-          items={fileTree}
-          multiSelect
-          checkboxSelection
-          selectedItems={selectedFileItems}
-          onSelectedItemsChange={(_, ids) => {
-            // console.log({ids})
-            // Drop any folder IDs; keep files only
-            const filesOnly = (ids as (string | number)[]).filter((id) =>
-              fileIdSet.has(String(id))
-            );
-            onSelectionChange?.(filesOnly);
-          }}
-          selectionPropagation={{ descendants: true, parents: true }}
-          itemChildrenIndentation={16}
-          slots={{ item: CustomTreeItem }}
-          sx={{ flexGrow: 1, maxWidth: '100%', color: 'var(--text-normal)' }}
-        />
-      ))}
+      {!isCollapsed &&
+        (loading ? (
+          <div style={{ padding: "0 10px", color: "var(--text-muted)" }}>
+            Loading...
+          </div>
+        ) : (
+          <RichTreeView
+            aria-label={`${title} files`}
+            items={fileTree}
+            multiSelect
+            checkboxSelection
+            selectedItems={selectedFileItems}
+            onSelectedItemsChange={(_, ids) => {
+              // console.log({ids})
+              // Drop any folder IDs; keep files only
+              const filesOnly = (ids as (string | number)[]).filter((id) =>
+                fileIdSet.has(String(id)),
+              );
+              onSelectionChange?.(filesOnly);
+            }}
+            selectionPropagation={{ descendants: true, parents: true }}
+            itemChildrenIndentation={16}
+            slots={{ item: CustomTreeItem }}
+            sx={{ flexGrow: 1, maxWidth: "100%", color: "var(--text-normal)" }}
+          />
+        ))}
     </div>
   );
 };
@@ -198,7 +238,12 @@ export class PublishStatusModal extends Modal {
     const container = this.contentEl.createDiv();
     container.addClass("publish-status-view");
     this.root = createRoot(container);
-    this.root.render(<PublishStatusModalContent {...this.props} onClose={() => this.close()} />);
+    this.root.render(
+      <PublishStatusModalContent
+        {...this.props}
+        onClose={() => this.close()}
+      />,
+    );
   }
 
   onClose() {
@@ -212,26 +257,30 @@ interface PublishStatusModalContentProps extends PublishStatusModalProps {
   onClose: () => void;
 }
 
-const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({ 
-  app, 
-  publisher, 
+const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
+  app,
+  publisher,
   settings,
-  onClose 
+  onClose,
 }) => {
-  const [publishStatus, setPublishStatus] = React.useState<PublishStatus | null>(null);
-  const [selectedBySection, setSelectedBySection] = React.useState<Record<"Changed"| "New" | "Deleted" | "Unchanged", string[]>>({
+  const [publishStatus, setPublishStatus] =
+    React.useState<PublishStatus | null>(null);
+  const [selectedBySection, setSelectedBySection] = React.useState<
+    Record<"Changed" | "New" | "Deleted" | "Unchanged", string[]>
+  >({
     Changed: [],
     New: [],
     Deleted: [],
     Unchanged: [],
   });
 
-  const { unchangedFiles, changedFiles, newFiles, deletedFiles } = publishStatus || {
-    unchangedFiles: [],
-    changedFiles: [],
-    newFiles: [],
-    deletedFiles: []
-  };
+  const { unchangedFiles, changedFiles, newFiles, deletedFiles } =
+    publishStatus || {
+      unchangedFiles: [],
+      changedFiles: [],
+      newFiles: [],
+      deletedFiles: [],
+    };
 
   const isLoading = !publishStatus;
 
@@ -249,21 +298,27 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
   };
 
   const handlePublishOperation = async (
-    operation: 'publish' | 'unpublish',
+    operation: "publish" | "unpublish",
     count: number,
     action: () => Promise<{ prNumber: number; prUrl: string; merged: boolean }>,
   ) => {
     try {
-      new Notice(`⌛ ${operation === 'publish' ? 'Publishing' : 'Unpublishing'} ${count} files...`);
+      new Notice(
+        `⌛ ${operation === "publish" ? "Publishing" : "Unpublishing"} ${count} files...`,
+      );
       const result = await action();
       const frag = document.createDocumentFragment();
-      frag.append(document.createTextNode(`✅ ${operation === 'publish' ? 'Published' : 'Unpublished'} ${count} notes. PR #${result.prNumber} `));
+      frag.append(
+        document.createTextNode(
+          `✅ ${operation === "publish" ? "Published" : "Unpublished"} ${count} notes. PR #${result.prNumber} `,
+        ),
+      );
 
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = result.prUrl;
-      a.textContent = result.merged ? 'merged' : 'created';
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
+      a.textContent = result.merged ? "merged" : "created";
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
 
       frag.append(a);
       new Notice(frag, 8000);
@@ -271,7 +326,9 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
       if (e instanceof FlowershowError) {
         new Notice(`❌ Couldn't ${operation} files: ${e.message}`);
       }
-      new Notice(`❌ Couldn't ${operation} files. See console errors for more info.`);
+      new Notice(
+        `❌ Couldn't ${operation} files. See console errors for more info.`,
+      );
       throw e;
     }
     await fetchStatus();
@@ -280,55 +337,58 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
   const publishSelectedNewFiles = async () => {
     const selectedIds = selectedBySection.New;
     const files = mapIdsToTFiles(newFiles, selectedIds);
-    await handlePublishOperation('publish', files.length, () =>
-      publisher.publishBatch({ filesToPublish: files })
+    await handlePublishOperation("publish", files.length, () =>
+      publisher.publishBatch({ filesToPublish: files }),
     );
   };
 
   const publishSelectedChangedFiles = async () => {
     const selectedIds = selectedBySection.Changed;
     const files = mapIdsToTFiles(changedFiles, selectedIds);
-    await handlePublishOperation('publish', files.length, () =>
-      publisher.publishBatch({ filesToPublish: files })
+    await handlePublishOperation("publish", files.length, () =>
+      publisher.publishBatch({ filesToPublish: files }),
     );
   };
 
   const unpublishSelectedDeletedFiles = async () => {
     const paths = selectedBySection.Deleted;
-    await handlePublishOperation('unpublish', paths.length, () =>
-      publisher.publishBatch({ filesToDelete: paths })
+    await handlePublishOperation("unpublish", paths.length, () =>
+      publisher.publishBatch({ filesToDelete: paths }),
     );
   };
 
   const unpublishSelectedUnchangedFiles = async () => {
     const paths = selectedBySection.Unchanged;
-    await handlePublishOperation('unpublish', paths.length, () =>
-      publisher.publishBatch({ filesToDelete: paths })
+    await handlePublishOperation("unpublish", paths.length, () =>
+      publisher.publishBatch({ filesToDelete: paths }),
     );
   };
 
   return (
     <>
-      <div className="publish-header" style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '20px',
-        padding: '10px',
-        borderBottom: '1px solid var(--background-modifier-border)'
-      }}>
+      <div
+        className="publish-header"
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "20px",
+          padding: "10px",
+          borderBottom: "1px solid var(--background-modifier-border)",
+        }}
+      >
         <div>
-          <p className="publish-header-text" style={{ margin: '0' }}>
-            Publishing to{' '}
+          <p className="publish-header-text" style={{ margin: "0" }}>
+            Publishing to{" "}
             <a
               href={`https://github.com/${settings.githubUserName}/${settings.githubRepo}`}
-              style={{ color: 'var(--text-accent)', textDecoration: 'none' }}
+              style={{ color: "var(--text-accent)", textDecoration: "none" }}
             >
               {settings.githubUserName}/{settings.githubRepo}
             </a>
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: "flex", gap: "8px" }}>
           {/* <button
             onClick={async () => {
               if (!publishStatus) return;
@@ -352,8 +412,24 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
           >
             Publish All
           </button> */}
-          <div title="Refresh" className="clickable-icon" onClick={refreshStatus} style={{ cursor: 'pointer' }}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="svg-icon lucide-refresh-cw">
+          <div
+            title="Refresh"
+            className="clickable-icon"
+            onClick={refreshStatus}
+            style={{ cursor: "pointer" }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="svg-icon lucide-refresh-cw"
+            >
               <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
               <path d="M21 3v5h-5"></path>
               <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
@@ -389,7 +465,7 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
           onButtonClick={publishSelectedChangedFiles}
           selectedItems={selectedBySection.Changed}
           onSelectionChange={(ids) => {
-            setSelectedBySection((s) => ({ ...s, Changed: ids as string[] }))
+            setSelectedBySection((s) => ({ ...s, Changed: ids as string[] }));
           }}
         />
 
@@ -433,78 +509,78 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
           defaultCollapsed={true}
         />
       </div>
-
     </>
   );
 };
 
 // Simple styled wrappers for the custom item row (optional, minimal)
-const ItemRoot = styled('li')({
-  listStyle: 'none',
+const ItemRoot = styled("li")({
+  listStyle: "none",
 });
-const ItemContent = styled('div')(({ theme }) => ({
-  display: 'flex',
-  alignItems: 'center',
+const ItemContent = styled("div")(({ theme }) => ({
+  display: "flex",
+  alignItems: "center",
   gap: theme.spacing(1),
   padding: theme.spacing(0.5, 1),
   borderRadius: 6,
-  cursor: 'pointer',
+  cursor: "pointer",
 }));
 
 interface CustomTreeItemProps
-  extends Omit<UseTreeItemParameters, 'rootRef'>,
-    Omit<React.HTMLAttributes<HTMLLIElement>, 'onFocus'> {}
+  extends Omit<UseTreeItemParameters, "rootRef">,
+    Omit<React.HTMLAttributes<HTMLLIElement>, "onFocus"> {}
 
-const CustomTreeItem = React.forwardRef(
-  function CustomTreeItem(props: CustomTreeItemProps, ref: React.Ref<HTMLLIElement>) {
-    const { id, itemId, label, disabled, children, ...other } = props;
+const CustomTreeItem = React.forwardRef(function CustomTreeItem(
+  props: CustomTreeItemProps,
+  ref: React.Ref<HTMLLIElement>,
+) {
+  const { id, itemId, label, disabled, children, ...other } = props;
 
-    const {
-      getContextProviderProps,
-      getRootProps,
-      getContentProps,
-      getIconContainerProps,
-      getCheckboxProps,
-      getLabelProps,
-      getGroupTransitionProps,
-      getDragAndDropOverlayProps,
-      status,
-    } = useTreeItem({ id, itemId, label, disabled, rootRef: ref });
+  const {
+    getContextProviderProps,
+    getRootProps,
+    getContentProps,
+    getIconContainerProps,
+    getCheckboxProps,
+    getLabelProps,
+    getGroupTransitionProps,
+    getDragAndDropOverlayProps,
+    status,
+  } = useTreeItem({ id, itemId, label, disabled, rootRef: ref });
 
-    // const item = useTreeItemModel<ExtendedTreeItemProps>(itemId);
+  // const item = useTreeItemModel<ExtendedTreeItemProps>(itemId);
 
-    let IconComp = InsertDriveFileIcon;
-    if (status.expandable) {
-      IconComp = FolderRoundedIcon;
-    }
-
-    return (
-      <TreeItemProvider {...getContextProviderProps()}>
-        <TreeItemRoot {...getRootProps(other)}>
-          <TreeItemContent {...getContentProps()}>
-            <TreeItemIconContainer {...getIconContainerProps()}>
-              <TreeItemIcon status={status} />
-            </TreeItemIconContainer>
-            <Box sx={{ flexGrow: 1, display: 'flex', gap: 1 }}>
-              <TreeItemCheckbox {...getCheckboxProps()} />
-              <IconComp fontSize="small" />
-              <TreeItemLabel {...getLabelProps()} />
-            </Box>
-          <TreeItemDragAndDropOverlay {...getDragAndDropOverlayProps()} />
-          </TreeItemContent>
-          {children ? (
-            <TreeItemGroupTransition {...getGroupTransitionProps()}>
-              {children}
-            </TreeItemGroupTransition>
-          ) : null}
-        </TreeItemRoot>
-      </TreeItemProvider>
-    );
+  let IconComp = InsertDriveFileIcon;
+  if (status.expandable) {
+    IconComp = FolderRoundedIcon;
   }
-);
+
+  return (
+    <TreeItemProvider {...getContextProviderProps()}>
+      <TreeItemRoot {...getRootProps(other)}>
+        <TreeItemContent {...getContentProps()}>
+          <TreeItemIconContainer {...getIconContainerProps()}>
+            <TreeItemIcon status={status} />
+          </TreeItemIconContainer>
+          <Box sx={{ flexGrow: 1, display: "flex", gap: 1 }}>
+            <TreeItemCheckbox {...getCheckboxProps()} />
+            <IconComp fontSize="small" />
+            <TreeItemLabel {...getLabelProps()} />
+          </Box>
+          <TreeItemDragAndDropOverlay {...getDragAndDropOverlayProps()} />
+        </TreeItemContent>
+        {children ? (
+          <TreeItemGroupTransition {...getGroupTransitionProps()}>
+            {children}
+          </TreeItemGroupTransition>
+        ) : null}
+      </TreeItemRoot>
+    </TreeItemProvider>
+  );
+});
 
 // --- Helpers: map selection (ids) -> TFile[] or string[] ---
 function mapIdsToTFiles(pool: TFile[], ids: string[]): TFile[] {
-  const byPath = new Map(pool.map(f => [f.path, f]));
-  return ids.map(id => byPath.get(id)).filter((v): v is TFile => !!v);
+  const byPath = new Map(pool.map((f) => [f.path, f]));
+  return ids.map((id) => byPath.get(id)).filter((v): v is TFile => !!v);
 }

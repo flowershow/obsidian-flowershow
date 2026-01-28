@@ -2,46 +2,56 @@ import { App, Notice, TFile } from "obsidian";
 import { IFlowershowSettings } from "./settings";
 import { Octokit } from "@octokit/rest";
 import { validatePublishFrontmatter, validateSettings } from "./Validator";
-import { detectGitAlgoFromSha, FlowershowError, gitBlobOidFromBinary, gitBlobOidFromText, isPlainTextExtension } from "./utils";
+import {
+  detectGitAlgoFromSha,
+  FlowershowError,
+  gitBlobOidFromBinary,
+  gitBlobOidFromText,
+  isPlainTextExtension,
+} from "./utils";
 import PublishStatusBar from "./PublishStatusBar";
 import { slug } from "github-slugger";
 
 export interface PublishStatus {
-    unchangedFiles: Array<TFile>;
-    changedFiles: Array<TFile>;
-    newFiles: Array<TFile>;
-    deletedFiles: Array<string>;
+  unchangedFiles: Array<TFile>;
+  changedFiles: Array<TFile>;
+  newFiles: Array<TFile>;
+  deletedFiles: Array<string>;
 }
 
 export type PathToHashDict = { [key: string]: string };
 
 export default class Publisher {
-    private app: App;
-    private settings: IFlowershowSettings;
-    private publishStatusBar: PublishStatusBar;
+  private app: App;
+  private settings: IFlowershowSettings;
+  private publishStatusBar: PublishStatusBar;
 
-    constructor(app: App, settings: IFlowershowSettings, publishStatusBar: PublishStatusBar) {
-        this.app = app;
-        this.settings = settings;
-        this.publishStatusBar = publishStatusBar;
-    }
+  constructor(
+    app: App,
+    settings: IFlowershowSettings,
+    publishStatusBar: PublishStatusBar,
+  ) {
+    this.app = app;
+    this.settings = settings;
+    this.publishStatusBar = publishStatusBar;
+  }
 
-    /** Get or create Octokit instance with current settings */
-    private get octokit(): Octokit {
-      // Always recreate to ensure we use the latest token
-      return new Octokit({
-        auth: this.settings.githubToken,
-        request: {
-          // Force fresh network fetches
-          fetch: (url: any, options: any) =>
-            fetch(url, { ...options, cache: "no-store" }),
-          // and disable ETag conditional requests
-          // (Octokit won't add If-None-Match if you pass an empty one)
-          // You can also set this per-call instead of globally.
-          // headers: { 'If-None-Match': '' } // optional global default
-        }
-        });
-    }
+  /** Get or create Octokit instance with current settings */
+  private get octokit(): Octokit {
+    // Always recreate to ensure we use the latest token
+    return new Octokit({
+      auth: this.settings.githubToken,
+      request: {
+        // Force fresh network fetches
+        fetch: (url: any, options: any) =>
+          fetch(url, { ...options, cache: "no-store" }),
+        // and disable ETag conditional requests
+        // (Octokit won't add If-None-Match if you pass an empty one)
+        // You can also set this per-call instead of globally.
+        // headers: { 'If-None-Match': '' } // optional global default
+      },
+    });
+  }
 
   /** ---------- Public API ---------- */
   async testConnection(): Promise<{ success: boolean; message: string }> {
@@ -85,7 +95,10 @@ export default class Publisher {
           }
         } catch (scopeError: any) {
           // Missing read:user or other oddities – don't fail the whole test.
-          console.warn("Warning: Could not verify classic token scopes:", scopeError);
+          console.warn(
+            "Warning: Could not verify classic token scopes:",
+            scopeError,
+          );
         }
       }
 
@@ -127,7 +140,8 @@ export default class Publisher {
         if (!writeCheck.ok) {
           return {
             success: false,
-            message: writeCheck.message ?? "Fine-grained token lacks write access.",
+            message:
+              writeCheck.message ?? "Fine-grained token lacks write access.",
           };
         }
       }
@@ -174,7 +188,10 @@ export default class Publisher {
           };
         }
 
-        console.warn("Warning: Could not verify pull request permissions:", prError);
+        console.warn(
+          "Warning: Could not verify pull request permissions:",
+          prError,
+        );
       }
 
       //
@@ -184,12 +201,12 @@ export default class Publisher {
         tokenType === "classic"
           ? "Classic token detected."
           : tokenType === "fine-grained"
-          ? "Fine-grained token detected."
-          : "Token type could not be determined (non-standard prefix).";
+            ? "Fine-grained token detected."
+            : "Token type could not be determined (non-standard prefix).";
 
       return {
         success: true,
-        message: "Connected to the repo with required permissions."
+        message: "Connected to the repo with required permissions.",
       };
     } catch (error: any) {
       const status = error?.status;
@@ -244,194 +261,233 @@ export default class Publisher {
     }
   }
 
-  
   /** Publish any file */
   async publishFile(file: TFile) {
-    const cachedFile = this.app.metadataCache.getCache(file.path)
+    const cachedFile = this.app.metadataCache.getCache(file.path);
     if (!cachedFile) {
-      throw new FlowershowError(`Note file ${file.path} not found!`)
+      throw new FlowershowError(`Note file ${file.path} not found!`);
     }
 
     if (file.extension === "md" || file.extension === "mdx") {
-      const frontmatter = cachedFile.frontmatter
+      const frontmatter = cachedFile.frontmatter;
 
       if (frontmatter && !validatePublishFrontmatter(frontmatter)) {
-          throw new FlowershowError("Can't publish note with `publish: false`")
+        throw new FlowershowError("Can't publish note with `publish: false`");
       }
 
       const markdown = await this.app.vault.cachedRead(file);
-      await this.uploadToGithub(file.path, Buffer.from(markdown).toString('base64'))
-    } else if (file.extension === "json" || file.extension === "css" || file.extension === "yaml" || file.extension === "yml") {
+      await this.uploadToGithub(
+        file.path,
+        Buffer.from(markdown).toString("base64"),
+      );
+    } else if (
+      file.extension === "json" ||
+      file.extension === "css" ||
+      file.extension === "yaml" ||
+      file.extension === "yml"
+    ) {
       const content = await this.app.vault.cachedRead(file);
-      await this.uploadToGithub(file.path, Buffer.from(content).toString('base64'))
+      await this.uploadToGithub(
+        file.path,
+        Buffer.from(content).toString("base64"),
+      );
     } else {
       const content = await this.app.vault.readBinary(file);
-      await this.uploadToGithub(file.path, Buffer.from(content).toString('base64'))
+      await this.uploadToGithub(
+        file.path,
+        Buffer.from(content).toString("base64"),
+      );
     }
   }
 
+  /**
+   * Publish note and optionally its embeds by creating a PR
+   * @returns PR information including branch name, PR number, URL and merge status
+   */
+  async publishNote(
+    file: TFile,
+    withEmbeds = true,
+  ): Promise<{
+    branch: string;
+    prNumber: number;
+    prUrl: string;
+    merged: boolean;
+  }> {
+    const cachedFile = this.app.metadataCache.getCache(file.path);
+    if (!cachedFile) {
+      throw new FlowershowError(`Note file ${file.path} not found!`);
+    }
 
-    /**
-     * Publish note and optionally its embeds by creating a PR
-     * @returns PR information including branch name, PR number, URL and merge status
-     */
-    async publishNote(file: TFile, withEmbeds = true): Promise<{ branch: string; prNumber: number; prUrl: string; merged: boolean }> {
-      const cachedFile = this.app.metadataCache.getCache(file.path)
-      if (!cachedFile) {
-        throw new FlowershowError(`Note file ${file.path} not found!`)
-      }
+    const frontmatter = cachedFile.frontmatter;
 
-      const frontmatter = cachedFile.frontmatter
+    if (frontmatter && !validatePublishFrontmatter(frontmatter)) {
+      throw new FlowershowError("Can't publish note with `publish: false`");
+    }
 
-      if (frontmatter && !validatePublishFrontmatter(frontmatter)) {
-          throw new FlowershowError("Can't publish note with `publish: false`")
-      }
+    const filesToPublish: TFile[] = [file];
 
-      const filesToPublish: TFile[] = [file];
+    // Check frontmatter for image and avatar fields with wikilinks
+    if (frontmatter) {
+      const imageFields = ["image", "avatar"];
+      const wikilinkRegex = /^\[\[([^\]]+)\]\]$/;
 
-      // Check frontmatter for image and avatar fields with wikilinks
-      if (frontmatter) {
-        const imageFields = ['image', 'avatar'];
-        const wikilinkRegex = /^\[\[([^\]]+)\]\]$/;
-        
-        for (const field of imageFields) {
-          if (typeof frontmatter[field] === 'string') {
-            const match = frontmatter[field].match(wikilinkRegex);
-            if (match) {
-              const link = match[1]; // Get the content between [[]]
-              const imageFile = this.app.metadataCache.getFirstLinkpathDest(link, file.path);
-              if (imageFile && !filesToPublish.some(f => f.path === imageFile.path)) {
-                filesToPublish.push(imageFile);
-              }
+      for (const field of imageFields) {
+        if (typeof frontmatter[field] === "string") {
+          const match = frontmatter[field].match(wikilinkRegex);
+          if (match) {
+            const link = match[1]; // Get the content between [[]]
+            const imageFile = this.app.metadataCache.getFirstLinkpathDest(
+              link,
+              file.path,
+            );
+            if (
+              imageFile &&
+              !filesToPublish.some((f) => f.path === imageFile.path)
+            ) {
+              filesToPublish.push(imageFile);
             }
           }
         }
       }
+    }
 
-      if (withEmbeds) {
-        // Track unique embeds for this publish run
-        const uniqueEmbeds = new Map<string, TFile>();
-        
-        // First collect unique embeds
-        const markdown = await this.app.vault.read(file);
-        cachedFile.embeds?.forEach(embed => {
-          const embedTFile = this.app.metadataCache.getFirstLinkpathDest(embed.link, markdown);
-          if (embedTFile && !uniqueEmbeds.has(embedTFile.path)) {
-            uniqueEmbeds.set(embedTFile.path, embedTFile);
-          }
-        });
+    if (withEmbeds) {
+      // Track unique embeds for this publish run
+      const uniqueEmbeds = new Map<string, TFile>();
 
-        // Add embeds to files to publish
-        filesToPublish.push(...uniqueEmbeds.values());
-      }
-
-      // Create PR with all files
-      return await this.publishBatch({
-        filesToPublish,
-        branchNameHint: `publish-${slug(file.name)}`
+      // First collect unique embeds
+      const markdown = await this.app.vault.read(file);
+      cachedFile.embeds?.forEach((embed) => {
+        const embedTFile = this.app.metadataCache.getFirstLinkpathDest(
+          embed.link,
+          markdown,
+        );
+        if (embedTFile && !uniqueEmbeds.has(embedTFile.path)) {
+          uniqueEmbeds.set(embedTFile.path, embedTFile);
+        }
       });
+
+      // Add embeds to files to publish
+      filesToPublish.push(...uniqueEmbeds.values());
     }
 
-    async unpublishFile(notePath: string) {
-        await this.deleteFromGithub(notePath);
-        // TODO what about embeds that are not used elsewhere?
-    }
+    // Create PR with all files
+    return await this.publishBatch({
+      filesToPublish,
+      branchNameHint: `publish-${slug(file.name)}`,
+    });
+  }
 
-    async getPublishStatus(): Promise<PublishStatus> {
-        const unchangedFiles: Array<TFile> = []; // published and unchanged files in vault
-        const changedFiles: Array<TFile> = []; // published and changed files in vault
-        const deletedFiles: Array<string> = []; // published but deleted files from vault
-        const newFiles: Array<TFile> = []; // new, not yet published files
+  async unpublishFile(notePath: string) {
+    await this.deleteFromGithub(notePath);
+    // TODO what about embeds that are not used elsewhere?
+  }
 
-        const remoteFileHashes = await this.getRemoteFileHashes();
-        // console.log({remoteFileHashes})
-        
-        const localFiles = this.app.vault.getFiles();
-        // console.log({localFiles})
-        
-        const seenRemoteFiles = new Set<string>();
-        const algo = detectGitAlgoFromSha(remoteFileHashes[0])
-        
-        // Find new and changed files
-        for (const file of localFiles) {
-            const normalizedPath = this.normalizePath(file.path);
+  async getPublishStatus(): Promise<PublishStatus> {
+    const unchangedFiles: Array<TFile> = []; // published and unchanged files in vault
+    const changedFiles: Array<TFile> = []; // published and changed files in vault
+    const deletedFiles: Array<string> = []; // published but deleted files from vault
+    const newFiles: Array<TFile> = []; // new, not yet published files
 
-            // Check if file matches any exclude pattern
-            if (this.settings.excludePatterns?.some(pattern => {
-                try {
-                    const regex = new RegExp(pattern);
-                    return regex.test(normalizedPath);
-                } catch (e) {
-                    console.error(`Invalid regex pattern: ${pattern}`, e);
-                    return false;
-                }
-            })) {
-                continue; // Skip excluded files
-            }
+    const remoteFileHashes = await this.getRemoteFileHashes();
+    // console.log({remoteFileHashes})
 
-            const remoteHash = remoteFileHashes[normalizedPath];
-            
-            if (!remoteHash) {
-                // File exists locally but not remotely
-                newFiles.push(file);
-                continue;
-            }
-            
-            // Mark this remote file as seen
-            seenRemoteFiles.add(normalizedPath);
-            
-            let localOid: string;
-            if (isPlainTextExtension(file.extension)) {
-              const text = await this.app.vault.cachedRead(file); // string
-              localOid = await gitBlobOidFromText(text, algo);
-            } else {
-              const bytes = await this.app.vault.readBinary(file); // Uint8Array
-              localOid = await gitBlobOidFromBinary(bytes, algo);
-            }
+    const localFiles = this.app.vault.getFiles();
+    // console.log({localFiles})
 
-            // console.log({file: file.path, localOid, remoteHash})
-            // Compare hashes to determine if file has changed
-            if (localOid === remoteHash) {
-                unchangedFiles.push(file);
-            } else {
-                changedFiles.push(file);
-            }
-        }
-        
-        // Find deleted files (exist remotely but not locally)
-        for (const [remotePath, _] of Object.entries(remoteFileHashes)) {
-            if (!seenRemoteFiles.has(remotePath)) {
-                deletedFiles.push(remotePath);
-            }
-        }
+    const seenRemoteFiles = new Set<string>();
+    const algo = detectGitAlgoFromSha(remoteFileHashes[0]);
 
-        return {unchangedFiles, changedFiles, deletedFiles, newFiles };
-    }
+    // Find new and changed files
+    for (const file of localFiles) {
+      const normalizedPath = this.normalizePath(file.path);
 
-    private normalizePath(p: string): string {
-      return p.replace(/^\/+/, "");
-    }
-
-    private async getFileSha(owner: string, repo: string, path: string): Promise<string | null> {
-      const octo = this.octokit;
-      try {
-        const res = await octo.rest.repos.getContent({
-          owner,
-          repo,
-          path: this.normalizePath(path),
-          ref: this.settings.branch,
-          headers: {
-            'If-None-Match': ''
+      // Check if file matches any exclude pattern
+      if (
+        this.settings.excludePatterns?.some((pattern) => {
+          try {
+            const regex = new RegExp(pattern);
+            return regex.test(normalizedPath);
+          } catch (e) {
+            console.error(`Invalid regex pattern: ${pattern}`, e);
+            return false;
           }
-         })
-        // If it's a file, return its sha; if directory/array, treat as missing for single-file ops
-        return Array.isArray(res.data) ? null : (res.data.type === "file" ? res.data.sha ?? null : null);
-      } catch (e: any) {
-        if (e?.status === 404) return null;
-        console.error({e})
-        throw e;
+        })
+      ) {
+        continue; // Skip excluded files
+      }
+
+      const remoteHash = remoteFileHashes[normalizedPath];
+
+      if (!remoteHash) {
+        // File exists locally but not remotely
+        newFiles.push(file);
+        continue;
+      }
+
+      // Mark this remote file as seen
+      seenRemoteFiles.add(normalizedPath);
+
+      let localOid: string;
+      if (isPlainTextExtension(file.extension)) {
+        const text = await this.app.vault.cachedRead(file); // string
+        localOid = await gitBlobOidFromText(text, algo);
+      } else {
+        const bytes = await this.app.vault.readBinary(file); // Uint8Array
+        localOid = await gitBlobOidFromBinary(bytes, algo);
+      }
+
+      // console.log({file: file.path, localOid, remoteHash})
+      // Compare hashes to determine if file has changed
+      if (localOid === remoteHash) {
+        unchangedFiles.push(file);
+      } else {
+        changedFiles.push(file);
       }
     }
+
+    // Find deleted files (exist remotely but not locally)
+    for (const [remotePath, _] of Object.entries(remoteFileHashes)) {
+      if (!seenRemoteFiles.has(remotePath)) {
+        deletedFiles.push(remotePath);
+      }
+    }
+
+    return { unchangedFiles, changedFiles, deletedFiles, newFiles };
+  }
+
+  private normalizePath(p: string): string {
+    return p.replace(/^\/+/, "");
+  }
+
+  private async getFileSha(
+    owner: string,
+    repo: string,
+    path: string,
+  ): Promise<string | null> {
+    const octo = this.octokit;
+    try {
+      const res = await octo.rest.repos.getContent({
+        owner,
+        repo,
+        path: this.normalizePath(path),
+        ref: this.settings.branch,
+        headers: {
+          "If-None-Match": "",
+        },
+      });
+      // If it's a file, return its sha; if directory/array, treat as missing for single-file ops
+      return Array.isArray(res.data)
+        ? null
+        : res.data.type === "file"
+          ? (res.data.sha ?? null)
+          : null;
+    } catch (e: any) {
+      if (e?.status === 404) return null;
+      console.error({ e });
+      throw e;
+    }
+  }
 
   /**
    * Publish/delete multiple files on a new branch, commit each change separately,
@@ -441,25 +497,33 @@ export default class Publisher {
     filesToPublish?: TFile[];
     filesToDelete?: string[];
     branchNameHint?: string; // optional custom branch name, note: needs to be a valid ref, so e.g. no special signs or spaces
-  }): Promise<{ branch: string; prNumber: number; prUrl: string; merged: boolean }> {
+  }): Promise<{
+    branch: string;
+    prNumber: number;
+    prUrl: string;
+    merged: boolean;
+  }> {
     if (!validateSettings(this.settings)) {
       throw new FlowershowError("Invalid Flowershow GitHub settings");
     }
 
     if (!opts.filesToPublish?.length && !opts.filesToDelete?.length) {
-      throw new FlowershowError("No files to delete or publish provided")
+      throw new FlowershowError("No files to delete or publish provided");
     }
 
     this.publishStatusBar.start({
       publishTotal: opts.filesToPublish?.length,
-      deleteTotal: opts.filesToDelete?.length
-    })
+      deleteTotal: opts.filesToDelete?.length,
+    });
 
     const owner = this.settings.githubUserName;
     const repo = this.settings.githubRepo;
-    const baseBranch = (this.settings.branch?.trim() || "main");
+    const baseBranch = this.settings.branch?.trim() || "main";
 
-    const workBranch = await this.createWorkingBranch(baseBranch, opts.branchNameHint);
+    const workBranch = await this.createWorkingBranch(
+      baseBranch,
+      opts.branchNameHint,
+    );
 
     const filesToPublish = opts.filesToPublish ?? [];
     const filesToDelete = opts.filesToDelete ?? [];
@@ -467,17 +531,19 @@ export default class Publisher {
     // One commit per file: PUSH
     for (const file of filesToPublish) {
       const normalizedPath = this.normalizePath(file.path);
-      
+
       // Skip excluded files
-      if (this.settings.excludePatterns?.some(pattern => {
-        try {
-          const regex = new RegExp(pattern);
-          return regex.test(normalizedPath);
-        } catch (e) {
-          console.error(`Invalid regex pattern: ${pattern}`, e);
-          return false;
-        }
-      })) {
+      if (
+        this.settings.excludePatterns?.some((pattern) => {
+          try {
+            const regex = new RegExp(pattern);
+            return regex.test(normalizedPath);
+          } catch (e) {
+            console.error(`Invalid regex pattern: ${pattern}`, e);
+            return false;
+          }
+        })
+      ) {
         console.log(`Skipping excluded file: ${normalizedPath}`);
         continue;
       }
@@ -500,7 +566,8 @@ export default class Publisher {
       };
 
       await this.octokit.rest.repos.createOrUpdateFileContents({
-        owner, repo,
+        owner,
+        repo,
         path: filePath,
         message: `PUSH: ${filePath}`,
         content: base64content,
@@ -508,11 +575,10 @@ export default class Publisher {
         branch: workBranch,
         committer,
         author: committer,
-        headers: { "If-None-Match": "" }
+        headers: { "If-None-Match": "" },
       });
 
-      this.publishStatusBar.incrementPublish()
-
+      this.publishStatusBar.incrementPublish();
     }
 
     // One commit per file: DELETE
@@ -526,34 +592,41 @@ export default class Publisher {
       };
 
       await this.octokit.rest.repos.deleteFile({
-        owner, repo,
+        owner,
+        repo,
         path,
         message: `DELETE: ${path}`,
         sha,
         branch: workBranch,
         committer,
         author: committer,
-        headers: { "If-None-Match": "" }
+        headers: { "If-None-Match": "" },
       });
 
-      this.publishStatusBar.incrementDelete()
+      this.publishStatusBar.incrementDelete();
     }
 
     // Compose PR info
     const title = `Flowershow: ${filesToPublish.length} push(es), ${filesToDelete.length} delete(s)`;
     const body = [
-      filesToPublish.length ? `### Pushed\n${filesToPublish.map(f => `- ${this.normalizePath(f.path)}`).join("\n")}` : "",
-      filesToDelete.length ? `### Deleted\n${filesToDelete.map(p => `- ${this.normalizePath(p)}`).join("\n")}` : ""
-    ].filter(Boolean).join("\n\n");
+      filesToPublish.length
+        ? `### Pushed\n${filesToPublish.map((f) => `- ${this.normalizePath(f.path)}`).join("\n")}`
+        : "",
+      filesToDelete.length
+        ? `### Deleted\n${filesToDelete.map((p) => `- ${this.normalizePath(p)}`).join("\n")}`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
 
     const { prNumber, prUrl, merged } = await this.createPRAndMaybeMerge({
       branch: workBranch,
       baseBranch,
       title,
-      body
+      body,
     });
 
-    this.publishStatusBar.finish(5000)
+    this.publishStatusBar.finish(5000);
 
     return { branch: workBranch, prNumber, prUrl, merged };
   }
@@ -561,31 +634,36 @@ export default class Publisher {
   // content is base64 string
   private async uploadToGithub(path: string, content: string) {
     // console.log(`Uploading ${path}`)
-    if (!validateSettings(this.settings)) throw new FlowershowError("Invalid Flowershow GitHub settings");
+    if (!validateSettings(this.settings))
+      throw new FlowershowError("Invalid Flowershow GitHub settings");
 
     const normalizedPath = this.normalizePath(path);
-    
+
     // Check if file should be excluded
-    if (this.settings.excludePatterns?.some(pattern => {
-      try {
-        const regex = new RegExp(pattern);
-        return regex.test(normalizedPath);
-      } catch (e) {
-        console.error(`Invalid regex pattern: ${pattern}`, e);
-        return false;
-      }
-    })) {
-      throw new FlowershowError(`File ${path} matches exclude pattern and cannot be published`);
+    if (
+      this.settings.excludePatterns?.some((pattern) => {
+        try {
+          const regex = new RegExp(pattern);
+          return regex.test(normalizedPath);
+        } catch (e) {
+          console.error(`Invalid regex pattern: ${pattern}`, e);
+          return false;
+        }
+      })
+    ) {
+      throw new FlowershowError(
+        `File ${path} matches exclude pattern and cannot be published`,
+      );
     }
 
     const owner = this.settings.githubUserName;
     const repo = this.settings.githubRepo;
-    const branch = this.settings.branch?.trim() || 'main';
+    const branch = this.settings.branch?.trim() || "main";
     const filePath = this.normalizePath(path);
     const octo = this.octokit;
     const committer = {
-        name: this.settings.githubUserName,
-        email: `${this.settings.githubUserName}@users.noreply.github.com`
+      name: this.settings.githubUserName,
+      email: `${this.settings.githubUserName}@users.noreply.github.com`,
     };
 
     const createOrUpdate = async () => {
@@ -603,45 +681,51 @@ export default class Publisher {
         committer,
         author: committer,
         headers: {
-          'If-None-Match': ''
-        }
-      })
-    }
+          "If-None-Match": "",
+        },
+      });
+    };
 
     try {
-      await createOrUpdate()
+      await createOrUpdate();
     } catch (e) {
-      await new Promise(r => setTimeout(createOrUpdate, 1000));
+      await new Promise((r) => setTimeout(createOrUpdate, 1000));
     }
   }
 
   private async deleteFromGithub(path: string) {
-      if (!validateSettings(this.settings)) {
-          throw {}
-      }
+    if (!validateSettings(this.settings)) {
+      throw {};
+    }
 
-      const payload = {
-          owner: this.settings.githubUserName,
-          repo: this.settings.githubRepo,
-          path,
-          message: `Delete content ${path}`,
-          sha: ''
-      };
+    const payload = {
+      owner: this.settings.githubUserName,
+      repo: this.settings.githubRepo,
+      path,
+      message: `Delete content ${path}`,
+      sha: "",
+    };
 
-      const response = await this.octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
-          owner: this.settings.githubUserName,
-          repo: this.settings.githubRepo,
-          path
-      });
+    const response = await this.octokit.request(
+      "GET /repos/{owner}/{repo}/contents/{path}",
+      {
+        owner: this.settings.githubUserName,
+        repo: this.settings.githubRepo,
+        path,
+      },
+    );
 
-      // Handle both single file and directory responses
-      const fileData = Array.isArray(response.data) ? null : response.data;
-      
-      if (response.status === 200 && fileData?.type === "file") {
-          payload.sha = fileData.sha;
-      }
+    // Handle both single file and directory responses
+    const fileData = Array.isArray(response.data) ? null : response.data;
 
-      await this.octokit.request('DELETE /repos/{owner}/{repo}/contents/{path}', payload);
+    if (response.status === 200 && fileData?.type === "file") {
+      payload.sha = fileData.sha;
+    }
+
+    await this.octokit.request(
+      "DELETE /repos/{owner}/{repo}/contents/{path}",
+      payload,
+    );
   }
 
   /** Get dictionary of path->hash of all the files in the repo */
@@ -654,35 +738,47 @@ export default class Publisher {
       recursive: "1",
       headers: {
         // Forces GitHub to skip ETag-based caching and return fresh data
-        "If-None-Match": ""
-      }
+        "If-None-Match": "",
+      },
     });
 
     const files = data.tree ?? [];
 
     const notes: Array<{ path: string; sha: string }> = files
-      .filter((file)  => !!file && file.type === "blob" && typeof file.path === "string"
+      .filter(
+        (file) =>
+          !!file && file.type === "blob" && typeof file.path === "string",
       )
       .map(({ path, sha }) => ({ path, sha }));
 
-    const hashes: PathToHashDict = notes.reduce<PathToHashDict>((dict, note) => {
-      dict[note.path] = note.sha;
-      return dict;
-    }, {});
+    const hashes: PathToHashDict = notes.reduce<PathToHashDict>(
+      (dict, note) => {
+        dict[note.path] = note.sha;
+        return dict;
+      },
+      {},
+    );
 
     return hashes;
   }
 
-  private async createWorkingBranch(baseBranch: string, desiredName?: string): Promise<string> {
+  private async createWorkingBranch(
+    baseBranch: string,
+    desiredName?: string,
+  ): Promise<string> {
     const owner = this.settings.githubUserName;
     const repo = this.settings.githubRepo;
     const octo = this.octokit;
 
     // Get base ref SHA
-    const baseRef = await octo.rest.git.getRef({
-      owner, repo, ref: `heads/${baseBranch}`,
-      headers: { "If-None-Match": "" }
-    }).then(r => r.data);
+    const baseRef = await octo.rest.git
+      .getRef({
+        owner,
+        repo,
+        ref: `heads/${baseBranch}`,
+        headers: { "If-None-Match": "" },
+      })
+      .then((r) => r.data);
 
     // Find a unique branch name
     const baseName = desiredName || `flowershow/publish-${Date.now()}`;
@@ -700,28 +796,35 @@ export default class Publisher {
 
     // Create ref
     await octo.rest.git.createRef({
-      owner, repo,
+      owner,
+      repo,
       ref: `refs/heads/${branchName}`,
-      sha: baseRef.object.sha
+      sha: baseRef.object.sha,
     });
 
     return branchName;
   }
 
-  private async getFileShaOnBranch(path: string, branch: string): Promise<string | null> {
+  private async getFileShaOnBranch(
+    path: string,
+    branch: string,
+  ): Promise<string | null> {
     const owner = this.settings.githubUserName;
     const repo = this.settings.githubRepo;
     try {
       const res = await this.octokit.rest.repos.getContent({
-        owner, repo,
+        owner,
+        repo,
         path: this.normalizePath(path),
         ref: branch,
-        headers: { "If-None-Match": "" }
+        headers: { "If-None-Match": "" },
       });
 
       return Array.isArray(res.data)
         ? null
-        : (res.data.type === "file" ? (res.data.sha ?? null) : null);
+        : res.data.type === "file"
+          ? (res.data.sha ?? null)
+          : null;
     } catch (e: any) {
       if (e?.status === 404) return null;
       throw e;
@@ -739,11 +842,12 @@ export default class Publisher {
 
     // Create PR
     const pr = await this.octokit.rest.pulls.create({
-      owner, repo,
+      owner,
+      repo,
       head: params.branch,
       base: params.baseBranch,
       title: params.title,
-      body: params.body ?? ""
+      body: params.body ?? "",
     });
 
     const prNumber = pr.data.number;
@@ -756,10 +860,12 @@ export default class Publisher {
     // Try immediate merge via REST
     try {
       const merge = await this.octokit.rest.pulls.merge({
-        owner, repo,
+        owner,
+        repo,
         pull_number: prNumber,
         merge_method: "squash",
-        commit_title: this.settings.mergeCommitMessage || `Merge PR #${prNumber}`
+        commit_title:
+          this.settings.mergeCommitMessage || `Merge PR #${prNumber}`,
         // commit_message (body) is optional; GitHub will compose by default for squash
       });
       return { prNumber, prUrl, merged: merge.data.merged === true };
@@ -767,14 +873,16 @@ export default class Publisher {
       // If it can't merge yet (checks required, etc.), we *attempt* to enable auto-merge via GraphQL.
       // This requires the repo to have auto-merge enabled and the token to have permissions.
       try {
-        const prNode = await this.octokit.graphql<{ repository: { pullRequest: { id: string } } }>(
+        const prNode = await this.octokit.graphql<{
+          repository: { pullRequest: { id: string } };
+        }>(
           `
           query($owner:String!, $repo:String!, $number:Int!) {
             repository(owner:$owner, name:$repo) {
               pullRequest(number:$number) { id }
             }
           }`,
-          { owner, repo, number: prNumber }
+          { owner, repo, number: prNumber },
         );
 
         const prId = prNode.repository.pullRequest.id;
@@ -789,7 +897,11 @@ export default class Publisher {
               commitHeadline:$title
             }) { clientMutationId }
           }`,
-          { prId, title: this.settings.mergeCommitMessage || `Auto-merge PR #${prNumber}` }
+          {
+            prId,
+            title:
+              this.settings.mergeCommitMessage || `Auto-merge PR #${prNumber}`,
+          },
         );
 
         return { prNumber, prUrl, merged: false }; // will merge when checks pass
@@ -810,7 +922,6 @@ function getTokenType(token: string | undefined | null): TokenType {
   if (t.startsWith("ghp_")) return "classic";
   return "unknown";
 }
-
 
 /**
  * For fine-grained tokens, actually probe write access by creating

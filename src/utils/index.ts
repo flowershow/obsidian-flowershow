@@ -6,8 +6,14 @@ function hex(buf: ArrayBuffer): string {
   return s;
 }
 
-async function digest(algo: "SHA-1" | "SHA-256", data: Uint8Array): Promise<string> {
-  const ab = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
+async function digest(
+  algo: "SHA-1" | "SHA-256",
+  data: Uint8Array,
+): Promise<string> {
+  const ab = data.buffer.slice(
+    data.byteOffset,
+    data.byteOffset + data.byteLength,
+  ) as ArrayBuffer;
   const d = await crypto.subtle.digest(algo, ab);
   return hex(d);
 }
@@ -33,12 +39,12 @@ export async function gitBlobOidFromText(text: string, algo: GitAlgo) {
 
 export async function gitBlobOidFromBinary(
   bytes: ArrayBuffer | Uint8Array,
-  algo: GitAlgo
+  algo: GitAlgo,
 ) {
-  const u8: Uint8Array = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes as ArrayBuffer);
+  const u8: Uint8Array =
+    bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes as ArrayBuffer);
   return gitBlobOid(u8, algo);
 }
-
 
 export class FlowershowError extends Error {
   constructor(message: string) {
@@ -52,20 +58,24 @@ export function detectGitAlgoFromSha(sha?: string): GitAlgo {
 }
 
 export function isPlainTextExtension(ext: string) {
-  return ["md", "mdx", "json", "yaml", "yml", "css"].includes(ext)
-
+  return ["md", "mdx", "json", "yaml", "yml", "css"].includes(ext);
 }
 export type GitAlgo = "SHA-1" | "SHA-256";
 
-export function createPRNotice(message: string, prNumber: number, prUrl: string, merged: boolean): DocumentFragment {
+export function createPRNotice(
+  message: string,
+  prNumber: number,
+  prUrl: string,
+  merged: boolean,
+): DocumentFragment {
   const frag = document.createDocumentFragment();
   frag.append(document.createTextNode(`${message} PR #${prNumber} `));
 
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = prUrl;
-  a.textContent = merged ? 'merged' : 'created';
-  a.target = '_blank';
-  a.rel = 'noopener noreferrer';
+  a.textContent = merged ? "merged" : "created";
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
 
   frag.append(a);
   return frag;
