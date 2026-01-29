@@ -1,7 +1,6 @@
 import Publisher from "./Publisher";
 import { IFlowershowSettings } from "./settings";
-import { Notice, Setting, debounce, MetadataCache, getIcon } from "obsidian";
-// import SiteManager from './SiteManager';
+import { Notice, Setting, debounce, MetadataCache } from "obsidian";
 
 export default class SettingView {
   private publisher: Publisher;
@@ -29,31 +28,29 @@ export default class SettingView {
 
   initialize() {
     this.settingsRootElement.empty();
-    this.settingsRootElement.createEl("h1", { text: "Flowershow Settings" });
+
+    // Link to Flowershow
     const linkDiv = this.settingsRootElement.createEl("div");
-    linkDiv.addClass("pr-link");
+
     linkDiv.createEl("a", {
       text: "Sign up for Flowershow →",
       href: "https://cloud.flowershow.app/login?utm_source=obsidian&utm_medium=referral",
     });
+    linkDiv.setCssProps({ padding: "15px 0" });
 
-    const githubHeader = this.settingsRootElement.createEl("h3", {
-      text: "GitHub Authentication",
+    // Authentication section
+    const authHeader = this.settingsRootElement.createEl("h2", {
+      text: "Authentication",
     });
-    const githubIcon = getIcon("github");
-    if (githubIcon) githubHeader.prepend(githubIcon);
 
-    this.initializeGitHubUserNameSetting();
-    this.initializeGitHubRepoSetting();
-    this.initializeGitHubTokenSetting();
-    this.initializeBranchSetting();
+    this.initializeTokenSetting();
+    this.initializeSiteNameSetting();
     this.initializeTestConnection();
 
-    const publishHeader = this.settingsRootElement.createEl("h3", {
+    // Publishing settings
+    const publishHeader = this.settingsRootElement.createEl("h2", {
       text: "Publishing Settings",
     });
-    this.initializeAutoMergeSetting();
-    this.initializeMergeMessageSetting();
     this.initializeExcludePatternsSetting();
   }
 
@@ -77,81 +74,49 @@ export default class SettingView {
     }
   }
 
-  private initializeGitHubRepoSetting() {
-    new Setting(this.settingsRootElement)
-      .setName("Repository name")
-      .setDesc("Name of the GitHub repository linked to your Flowershow site")
-      .addText((text) =>
-        text
-          .setPlaceholder("mygithubrepo")
-          .setValue(this.settings.githubRepo)
-          .onChange(async (value) => {
-            this.settings.githubRepo = value;
-            await this.saveSettings();
-          }),
-      );
-  }
-
-  private initializeGitHubUserNameSetting() {
-    new Setting(this.settingsRootElement)
-      .setName("Username")
-      .setDesc("Your GitHub username")
-      .addText((text) =>
-        text
-          .setPlaceholder("myusername")
-          .setValue(this.settings.githubUserName)
-          .onChange(async (value) => {
-            this.settings.githubUserName = value;
-            await this.saveSettings();
-          }),
-      );
-  }
-
-  private initializeBranchSetting() {
-    new Setting(this.settingsRootElement)
-      .setName("Branch")
-      .setDesc("The branch to publish to (defaults to main)")
-      .addText((text) =>
-        text
-          .setPlaceholder("main")
-          .setValue(this.settings.branch)
-          .onChange(async (value) => {
-            this.settings.branch = value;
-            await this.saveSettings();
-          }),
-      );
-  }
-
-  private initializeGitHubTokenSetting() {
+  private initializeTokenSetting() {
     const desc = document.createDocumentFragment();
     desc.createEl("span", undefined, (span) => {
       span.appendText(
-        "GitHub personal access token with repository permissions. You can generate one ",
+        "Your Flowershow Personal Access Token (PAT). You can generate one ",
       );
       span.createEl("a", undefined, (link) => {
-        link.href = "https://github.com/settings/tokens/new?scopes=repo";
+        link.href =
+          "https://cloud.flowershow.app/tokens?utm_source=obsidian&utm_medium=referral";
         link.innerText = "here!";
       });
       span.createEl("br");
       span.createEl("br");
-      span.createEl("strong", { text: "Required scopes:" });
-      span.createEl("br");
-      span.appendText("• Classic PAT: repo scope");
-      span.createEl("br");
-      span.appendText(
-        "• Fine-grained PAT: Contents and Pull Requests (both with read and write)",
-      );
+      span.appendText("The token should start with ");
+      span.createEl("code", { text: "fs_pat_" });
     });
 
     new Setting(this.settingsRootElement)
-      .setName("Personal Access Token")
+      .setName("Flowershow PAT Token")
       .setDesc(desc)
       .addText((text) =>
         text
-          .setPlaceholder("Secret Token")
-          .setValue(this.settings.githubToken)
+          .setPlaceholder("fs_pat_...")
+          .setValue(this.settings.flowershowToken)
           .onChange(async (value) => {
-            this.settings.githubToken = value;
+            this.settings.flowershowToken = value;
+            await this.saveSettings();
+          }),
+      );
+  }
+
+  private initializeSiteNameSetting() {
+    new Setting(this.settingsRootElement)
+      .setName("Site Name")
+      .setDesc(
+        "Name of your Flowershow site (will be created if it doesn't exist)",
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder("my-notes")
+          .setValue(this.settings.siteName)
+          .onChange(async (value) => {
+            this.settings.siteName = value;
             await this.saveSettings();
           }),
       );
@@ -160,9 +125,7 @@ export default class SettingView {
   private initializeTestConnection() {
     new Setting(this.settingsRootElement)
       .setName("Test Connection")
-      .setDesc(
-        "Test GitHub repository access, permissions, and branch existence",
-      )
+      .setDesc("Test Flowershow connection and validate your credentials")
       .addButton((button) =>
         button.setButtonText("Test Connection").onClick(async () => {
           button.setDisabled(true);
@@ -185,35 +148,6 @@ export default class SettingView {
       );
   }
 
-  private initializeAutoMergeSetting() {
-    new Setting(this.settingsRootElement)
-      .setName("Auto-merge Pull Requests")
-      .setDesc("Automatically merge pull requests after creation")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.settings.autoMergePullRequests)
-          .onChange(async (value) => {
-            this.settings.autoMergePullRequests = value;
-            await this.saveSettings();
-          }),
-      );
-  }
-
-  private initializeMergeMessageSetting() {
-    new Setting(this.settingsRootElement)
-      .setName("Merge Commit Message")
-      .setDesc("Default message for merge commits")
-      .addText((text) =>
-        text
-          .setPlaceholder("Merge content updates")
-          .setValue(this.settings.mergeCommitMessage)
-          .onChange(async (value) => {
-            this.settings.mergeCommitMessage = value;
-            await this.saveSettings();
-          }),
-      );
-  }
-
   private initializeExcludePatternsSetting() {
     const settingContainer = this.settingsRootElement.createDiv(
       "exclude-patterns-container",
@@ -226,12 +160,12 @@ export default class SettingView {
       )
       .addTextArea((textarea) => {
         textarea
-          .setPlaceholder("^\\.git/\n^node_modules/\n\\.DS_Store$")
-          .setValue(this.settings.excludePatterns.join("\n"))
+          .setPlaceholder("^\\.git/\\n^node_modules/\\n\\.DS_Store$")
+          .setValue(this.settings.excludePatterns.join("\\n"))
           .onChange(async (value) => {
             // Split by newlines and filter out empty lines
             const patterns = value
-              .split("\n")
+              .split("\\n")
               .filter((pattern) => pattern.trim() !== "");
             this.settings.excludePatterns = patterns;
             await this.saveSettings();
@@ -247,9 +181,9 @@ export default class SettingView {
       cls: "setting-item-description",
     });
     helpText.innerHTML = `
-      Note: This excludes files from being pushed to your GitHub repo, e.g. for some private content that you don't want to leave your personal computer. If you still want them to be pushed and version controled, but you don't want them to be published by Flowershow, exclude them in your config.json.
       Examples:<br>
-      • <code>^private/</code> - Exlude private directory
+      • <code>^private/</code> - Exclude private directory<br>
+      • <code>\\.excalidraw\\.md$</code> - Exclude Excalidraw files
     `;
   }
 }

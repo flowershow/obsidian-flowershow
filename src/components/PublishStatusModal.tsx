@@ -5,6 +5,7 @@ import { App, Modal, Notice, TFile } from "obsidian";
 import type { IFlowershowSettings } from "../settings";
 import type { PublishStatus } from "../Publisher";
 import Publisher from "../Publisher";
+import { API_URL } from "../settings";
 
 import { RichTreeView } from "@mui/x-tree-view/RichTreeView";
 import {
@@ -24,7 +25,6 @@ import {
   TreeItemRoot,
   TreeItemContent,
   TreeItemGroupTransition,
-  treeItemClasses,
 } from "@mui/x-tree-view/TreeItem";
 import { styled } from "@mui/material/styles";
 import { Box } from "@mui/material";
@@ -265,6 +265,9 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
 }) => {
   const [publishStatus, setPublishStatus] =
     React.useState<PublishStatus | null>(null);
+  const [publishStatusResponseStatus, setPublishStatusResponseStatus] =
+    React.useState<"loading" | "success" | "error">("success");
+  const [siteId, setSiteId] = React.useState<string | null>(null);
   const [selectedBySection, setSelectedBySection] = React.useState<
     Record<"Changed" | "New" | "Deleted" | "Unchanged", string[]>
   >({
@@ -285,8 +288,19 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
   const isLoading = !publishStatus;
 
   const fetchStatus = async () => {
-    const status = await publisher.getPublishStatus();
-    setPublishStatus(status);
+    setPublishStatusResponseStatus("loading");
+    try {
+      // Fetch site ID for the settings link
+      const id = await publisher.getSiteId();
+      setSiteId(id);
+      // Fetch publish status
+      const status = await publisher.getPublishStatus();
+      setPublishStatus(status);
+      setPublishStatusResponseStatus("success");
+    } catch (e) {
+      setPublishStatusResponseStatus("error");
+      console.error("Failed to fetch publish status", e);
+    }
   };
 
   React.useEffect(() => {
@@ -300,36 +314,43 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
   const handlePublishOperation = async (
     operation: "publish" | "unpublish",
     count: number,
-    action: () => Promise<{ prNumber: number; prUrl: string; merged: boolean }>,
+    action: () => Promise<{ siteUrl: string; filesPublished: number }>,
   ) => {
     try {
       new Notice(
-        `⌛ ${operation === "publish" ? "Publishing" : "Unpublishing"} ${count} files...`,
+        `⌛ ${
+          operation === "publish" ? "Publishing" : "Unpublishing"
+        } ${count} files...`,
       );
       const result = await action();
       const frag = document.createDocumentFragment();
       frag.append(
         document.createTextNode(
-          `✅ ${operation === "publish" ? "Published" : "Unpublished"} ${count} notes. PR #${result.prNumber} `,
+          `✅ ${operation === "publish" ? "Published" : "Unpublished"} ${
+            result.filesPublished
+          } files. `,
         ),
       );
 
-      const a = document.createElement("a");
-      a.href = result.prUrl;
-      a.textContent = result.merged ? "merged" : "created";
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
+      if (result.siteUrl) {
+        const a = document.createElement("a");
+        a.href = result.siteUrl;
+        a.textContent = "View site";
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        frag.append(a);
+      }
 
-      frag.append(a);
       new Notice(frag, 8000);
     } catch (e: any) {
       if (e instanceof FlowershowError) {
         new Notice(`❌ Couldn't ${operation} files: ${e.message}`);
+      } else {
+        new Notice(
+          `❌ Couldn't ${operation} files. See console errors for more info.`,
+        );
       }
-      new Notice(
-        `❌ Couldn't ${operation} files. See console errors for more info.`,
-      );
-      throw e;
+      console.error(e);
     }
     await fetchStatus();
   };
@@ -337,6 +358,7 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
   const publishSelectedNewFiles = async () => {
     const selectedIds = selectedBySection.New;
     const files = mapIdsToTFiles(newFiles, selectedIds);
+
     await handlePublishOperation("publish", files.length, () =>
       publisher.publishBatch({ filesToPublish: files }),
     );
@@ -365,78 +387,109 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
   };
 
   return (
-    <>
+    <div>
       <div
         className="publish-header"
         style={{
           display: "flex",
+          flexWrap: "nowrap",
           justifyContent: "space-between",
           alignItems: "center",
           marginBottom: "20px",
           padding: "10px",
           borderBottom: "1px solid var(--background-modifier-border)",
+          maxWidth: "100%",
+          gap: "12px",
         }}
       >
-        <div>
-          <p className="publish-header-text" style={{ margin: "0" }}>
-            Publishing to{" "}
-            <a
-              href={`https://github.com/${settings.githubUserName}/${settings.githubRepo}`}
-              style={{ color: "var(--text-accent)", textDecoration: "none" }}
-            >
-              {settings.githubUserName}/{settings.githubRepo}
-            </a>
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: "8px" }}>
-          {/* <button
-            onClick={async () => {
-              if (!publishStatus) return;
-              const filesToPublish = [...publishStatus.changedFiles, ...publishStatus.newFiles];
-              const filesToDelete = publishStatus.deletedFiles;
-              
-              if (!filesToDelete.length && !filesToPublish.length) {
-                new Notice("❌ Nothing new to publish or delete.");
-                return;
-              }
+        <p
+          className="publish-header-text"
+          style={{
+            margin: "0",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          Publishing to{" "}
+          <a
+            href={siteId ? `${API_URL}/site/${siteId}/settings` : `${API_URL}/`}
+            style={{
+              color: "var(--text-accent)",
+              textDecoration: "none",
+            }}
+          >
+            {settings.siteName}
+          </a>
+        </p>
+        <button
+          onClick={async () => {
+            if (!publishStatus) return;
+            const filesToPublish = [
+              ...publishStatus.changedFiles,
+              ...publishStatus.newFiles,
+            ];
+            const filesToDelete = publishStatus.deletedFiles;
 
-              await handlePublishOperation('publish', filesToPublish.length + filesToDelete.length, () =>
+            if (!filesToDelete.length && !filesToPublish.length) {
+              new Notice("❌ Nothing new to publish or delete.");
+              return;
+            }
+
+            await handlePublishOperation(
+              "publish",
+              filesToPublish.length + filesToDelete.length,
+              () =>
                 publisher.publishBatch({
                   filesToPublish,
-                  filesToDelete
-                })
-              );
+                  filesToDelete,
+                }),
+            );
+          }}
+          disabled={isLoading}
+          style={{
+            marginRight: "8px",
+            cursor:
+              publishStatusResponseStatus === "loading" ? "default" : "pointer",
+          }}
+        >
+          Publish All
+        </button>
+        <button
+          title="Refresh"
+          className="clickable-icon"
+          onClick={refreshStatus}
+          disabled={publishStatusResponseStatus === "loading"}
+          style={{
+            cursor:
+              publishStatusResponseStatus === "loading" ? "default" : "pointer",
+          }}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="svg-icon lucide-refresh-cw"
+            style={{
+              animation:
+                publishStatusResponseStatus === "loading"
+                  ? "spin 1s linear infinite"
+                  : "none",
             }}
-            disabled={isLoading}
-            style={{ marginRight: '8px' }}
           >
-            Publish All
-          </button> */}
-          <div
-            title="Refresh"
-            className="clickable-icon"
-            onClick={refreshStatus}
-            style={{ cursor: "pointer" }}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="svg-icon lucide-refresh-cw"
-            >
-              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
-              <path d="M21 3v5h-5"></path>
-              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
-              <path d="M3 21v-5h5"></path>
-            </svg>
-          </div>
-          {/* <div 
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+            <path d="M21 3v5h-5"></path>
+            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+            <path d="M3 21v-5h5"></path>
+          </svg>
+        </button>
+        {/* <div 
             className="clickable-icon" 
             onClick={() => {
               onClose();
@@ -452,7 +505,6 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
               <circle cx="12" cy="12" r="3"></circle>
             </svg>
           </div> */}
-        </div>
       </div>
 
       <div style={{ opacity: isLoading ? 0.7 : 1 }}>
@@ -509,22 +561,9 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
           defaultCollapsed={true}
         />
       </div>
-    </>
+    </div>
   );
 };
-
-// Simple styled wrappers for the custom item row (optional, minimal)
-const ItemRoot = styled("li")({
-  listStyle: "none",
-});
-const ItemContent = styled("div")(({ theme }) => ({
-  display: "flex",
-  alignItems: "center",
-  gap: theme.spacing(1),
-  padding: theme.spacing(0.5, 1),
-  borderRadius: 6,
-  cursor: "pointer",
-}));
 
 interface CustomTreeItemProps
   extends Omit<UseTreeItemParameters, "rootRef">,

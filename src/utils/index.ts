@@ -1,4 +1,3 @@
-// --- Hash helpers ---
 function hex(buf: ArrayBuffer): string {
   const b = new Uint8Array(buf);
   let s = "";
@@ -18,32 +17,30 @@ async function digest(
   return hex(d);
 }
 
-// Build: "blob <len>\0<bytes>"
-function gitBlobFramedBytes(contentBytes: Uint8Array): Uint8Array {
-  const header = new TextEncoder().encode(`blob ${contentBytes.byteLength}\0`);
-  const out = new Uint8Array(header.length + contentBytes.length);
-  out.set(header, 0);
-  out.set(contentBytes, header.length);
-  return out;
+/**
+ * Calculate SHA-1 hash of file content
+ * @param content - File content as ArrayBuffer or Uint8Array
+ * @returns SHA-1 hash as hex string
+ */
+export async function calculateFileSha(
+  content: ArrayBuffer | Uint8Array,
+): Promise<string> {
+  // Convert to Uint8Array for digest function
+  const data =
+    content instanceof ArrayBuffer ? new Uint8Array(content) : content;
+
+  return digest("SHA-1", data);
 }
 
-async function gitBlobOid(contentBytes: Uint8Array, algo: GitAlgo) {
-  const framed = gitBlobFramedBytes(contentBytes);
-  return digest(algo, framed);
-}
-
-export async function gitBlobOidFromText(text: string, algo: GitAlgo) {
-  const bytes = new TextEncoder().encode(text);
-  return gitBlobOid(bytes, algo);
-}
-
-export async function gitBlobOidFromBinary(
-  bytes: ArrayBuffer | Uint8Array,
-  algo: GitAlgo,
-) {
-  const u8: Uint8Array =
-    bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes as ArrayBuffer);
-  return gitBlobOid(u8, algo);
+/**
+ * Calculate SHA-1 hash of text content
+ * @param text - Text content as string
+ * @returns SHA-1 hash as hex string
+ */
+export async function calculateTextSha(text: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+  return digest("SHA-1", data);
 }
 
 export class FlowershowError extends Error {
@@ -53,30 +50,26 @@ export class FlowershowError extends Error {
   }
 }
 
-export function detectGitAlgoFromSha(sha?: string): GitAlgo {
-  return sha?.length === 64 ? "SHA-256" : "SHA-1";
-}
-
 export function isPlainTextExtension(ext: string) {
   return ["md", "mdx", "json", "yaml", "yml", "css"].includes(ext);
 }
 export type GitAlgo = "SHA-1" | "SHA-256";
 
-export function createPRNotice(
+export function createSiteNotice(
   message: string,
-  prNumber: number,
-  prUrl: string,
-  merged: boolean,
+  siteUrl?: string,
 ): DocumentFragment {
   const frag = document.createDocumentFragment();
-  frag.append(document.createTextNode(`${message} PR #${prNumber} `));
+  frag.append(document.createTextNode(`✅ ${message} `));
 
-  const a = document.createElement("a");
-  a.href = prUrl;
-  a.textContent = merged ? "merged" : "created";
-  a.target = "_blank";
-  a.rel = "noopener noreferrer";
+  if (siteUrl) {
+    const a = document.createElement("a");
+    a.href = siteUrl;
+    a.textContent = "View site →";
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    frag.append(a);
+  }
 
-  frag.append(a);
   return frag;
 }

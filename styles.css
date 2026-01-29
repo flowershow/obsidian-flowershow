@@ -23,3 +23,13 @@ If your plugin does not need CSS, delete this file.
 .MuiCheckbox-root .MuiSvgIcon-root {
   color: var(--text-faint);
 }
+
+/* Spin animation for refresh icon */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

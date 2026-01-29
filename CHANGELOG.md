@@ -1,5 +1,11 @@
 # flowershow
 
+## 4.0.0
+
+### Major Changes
+
+- BREAKING: Publish directly to Flowershow using PAT, without GitHub repository as an intermediary.
+
 ## 3.0.7
 
 ### Patch Changes

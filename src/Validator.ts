@@ -12,29 +12,23 @@ export function validatePublishFrontmatter(
 }
 
 export function validateSettings(settings: IFlowershowSettings): boolean {
-  if (!settings.githubRepo) {
+  if (!settings.flowershowToken) {
     new Notice(
-      "Config error: You need to define a GitHub repo in the plugin settings",
+      "Config error: You need to define a Flowershow PAT Token in the plugin settings",
     );
     return false;
   }
-  if (!settings.githubUserName) {
+  if (!settings.siteName) {
     new Notice(
-      "Config error: You need to define a GitHub Username in the plugin settings",
+      "Config error: You need to define a Site Name in the plugin settings",
     );
     return false;
   }
-  if (!settings.githubToken) {
+  if (!settings.flowershowToken.startsWith("fs_pat_")) {
     new Notice(
-      "Config error: You need to define a GitHub Token in the plugin settings",
+      "Config error: Invalid token format. Token should start with 'fs_pat_'",
     );
     return false;
-  }
-  if (!settings.branch?.trim()) {
-    new Notice(
-      "Config error: Branch cannot be empty. Using 'main' as default.",
-    );
-    settings.branch = "main";
   }
   return true;
 }

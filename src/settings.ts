@@ -1,19 +1,14 @@
 export const DEFAULT_SETTINGS: IFlowershowSettings = {
-  githubRepo: "",
-  githubToken: "",
-  githubUserName: "",
-  branch: "main",
-  autoMergePullRequests: true,
-  mergeCommitMessage: "Merge content updates",
-  excludePatterns: ["\.excalidraw(\.(md|excalidraw))?$"],
+  flowershowToken: "",
+  siteName: "",
+  excludePatterns: ["\\.excalidraw(\\.(md|excalidraw))?$"],
 };
 
 export interface IFlowershowSettings {
-  githubToken: string;
-  githubRepo: string;
-  githubUserName: string;
-  branch: string;
-  autoMergePullRequests: boolean;
-  mergeCommitMessage: string;
+  flowershowToken: string; // Flowershow PAT token (fs_pat_...)
+  siteName: string; // Project/site name
   excludePatterns: string[]; // Array of regex patterns to exclude files/folders
 }
+
+// API URL from environment (set at build time via esbuild define)
+export const API_URL = process.env.FLOWERSHOW_API_URL!;

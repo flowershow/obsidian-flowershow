@@ -16,7 +16,7 @@ import { PublishStatusModal } from "src/components/PublishStatusModal";
 import SettingView from "src/SettingView";
 
 import { flowershowIcon } from "src/constants";
-import { FlowershowError, createPRNotice } from "src/utils";
+import { FlowershowError, createSiteNotice } from "src/utils";
 
 export default class Flowershow extends Plugin {
   private startupAnalytics: string[] = [];
@@ -77,6 +77,10 @@ export default class Flowershow extends Plugin {
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+    // Recreate publisher with updated settings
+    this.publisher = new Publisher(this.app, this.settings, this.statusBar);
+    // Clear cached modal so it picks up new publisher
+    this.publishStatusModal = null!;
   }
 
   async addCommands() {
@@ -121,11 +125,9 @@ export default class Flowershow extends Plugin {
       }
       new Notice("⌛ Publishing note...");
       const result = await this.publisher.publishNote(currentFile);
-      const frag = createPRNotice(
-        "Published note.",
-        result.prNumber,
-        result.prUrl,
-        result.merged,
+      const frag = createSiteNotice(
+        `Published ${result.filesPublished} file(s).`,
+        result.siteUrl,
       );
       new Notice(frag, 8000);
     } catch (e: any) {
@@ -159,11 +161,9 @@ export default class Flowershow extends Plugin {
         filesToDelete,
       });
 
-      const frag = createPRNotice(
-        `Published ${filesToPublish.length + filesToDelete.length} notes.`,
-        result.prNumber,
-        result.prUrl,
-        result.merged,
+      const frag = createSiteNotice(
+        `Published ${result.filesPublished} file(s).`,
+        result.siteUrl,
       );
       new Notice(frag, 8000);
     } catch (e: any) {
@@ -215,7 +215,7 @@ class FlowershowSettingTab extends PluginSettingTab {
       this.plugin.publisher,
       this.plugin.settings,
       async () => {
-        await this.plugin.saveData(this.plugin.settings);
+        await this.plugin.saveSettings();
       },
     );
     settingView.initialize();
