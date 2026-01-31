@@ -162,12 +162,12 @@ export default class SettingView {
 			)
 			.addTextArea((textarea) => {
 				textarea
-					.setPlaceholder("^\\.git/\\n^node_modules/\\n\\.DS_Store$")
-					.setValue(this.settings.excludePatterns.join("\\n"))
+					.setPlaceholder("^\\.git/\n^node_modules/\n\\.DS_Store$")
+					.setValue(this.settings.excludePatterns.join("\n"))
 					.onChange(async (value) => {
 						// Split by newlines and filter out empty lines
 						const patterns = value
-							.split("\\n")
+							.split("\n")
 							.filter((pattern) => pattern.trim() !== "");
 						this.settings.excludePatterns = patterns;
 						await this.saveSettings();
