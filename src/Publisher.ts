@@ -33,6 +33,11 @@ export default class Publisher {
     this.client = new FlowershowClient(API_URL, this.settings.flowershowToken);
   }
 
+  /** Get site name, defaulting to vault name if not set */
+  getSiteName(): string {
+    return this.settings.siteName || this.app.vault.getName();
+  }
+
   /** Get username (cached or fetch) */
   private async getUsername(): Promise<string> {
     if (this.username) {
@@ -53,7 +58,7 @@ export default class Publisher {
     const username = await this.getUsername();
     const existingSite = await this.client.getSiteByName(
       username,
-      this.settings.siteName,
+      this.getSiteName(),
     );
 
     if (existingSite) {
@@ -74,7 +79,7 @@ export default class Publisher {
     const username = await this.getUsername();
     const existingSite = await this.client.getSiteByName(
       username,
-      this.settings.siteName,
+      this.getSiteName(),
     );
 
     if (existingSite) {
@@ -83,7 +88,7 @@ export default class Publisher {
     }
 
     // Create new site
-    const { site } = await this.client.createSite(this.settings.siteName);
+    const { site } = await this.client.createSite(this.getSiteName());
     this.siteId = site.id;
     return this.siteId;
   }
@@ -254,7 +259,7 @@ export default class Publisher {
       const username = await this.getUsername();
       const site = await this.client.getSiteByName(
         username,
-        this.settings.siteName,
+        this.getSiteName(),
       );
       const siteUrl = site?.site.url || "";
 
@@ -281,7 +286,7 @@ export default class Publisher {
     const username = await this.getUsername();
     const existingSite = await this.client.getSiteByName(
       username,
-      this.settings.siteName,
+      this.getSiteName(),
     );
 
     // If site doesn't exist, all local files are new

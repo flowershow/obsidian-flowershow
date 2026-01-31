@@ -1,5 +1,11 @@
 # flowershow
 
+## 4.0.8
+
+### Patch Changes
+
+- Default site name to vault name throughout Publisher
+
 ## 4.0.7
 
 ### Patch Changes
