@@ -1,5 +1,11 @@
 # flowershow
 
+## 4.0.2
+
+### Patch Changes
+
+- Add info box about the new version to the Settings Tab.
+
 ## 4.0.1
 
 ### Patch Changes

@@ -29,6 +29,35 @@ export default class SettingView {
 	initialize() {
 		this.settingsRootElement.empty();
 
+		// v4.0 Breaking Change Info Box
+		const infoBox = this.settingsRootElement.createEl("div", {
+			cls: "dg-info-box",
+		});
+		infoBox.style.cssText = `
+			background-color: var(--background-modifier-info);
+			border: 1px solid var(--background-modifier-border);
+			border-radius: 8px;
+			padding: 16px;
+			margin-bottom: 20px;
+		`;
+
+		infoBox.createEl("div", {
+			text: "🌸 New in v4.0",
+			cls: "dg-info-box-title",
+		}).style.cssText = `
+			font-weight: 600;
+			margin-bottom: 8px;
+			font-size: 1.1em;
+		`;
+
+		const infoContent = infoBox.createEl("div");
+		infoContent.innerHTML = `
+			<p style="margin: 0 0 8px 0;">The Flowershow plugin now publishes <strong>directly to Flowershow</strong> — no GitHub repository required.</p>
+			<p style="margin: 0 0 8px 0;">You'll need a <strong>Flowershow Personal Access Token</strong> to publish. Generate one at <a href="https://cloud.flowershow.app/tokens">cloud.flowershow.app/tokens</a>.</p>
+			<p style="margin: 0 0 8px 0;"><strong>Want to keep using GitHub?</strong> Use a separate tool (e.g. Obsidian Git) to sync your vault to GitHub. Flowershow Cloud will continue to publish from your repository.</p>
+			<p style="margin: 0;"><a href="https://flowershow.app/blog/announcing-obsidian-plugin-4">Learn more about this update →</a></p>
+		`;
+
 		// Link to Flowershow
 		const linkDiv = this.settingsRootElement.createEl("div");
 
