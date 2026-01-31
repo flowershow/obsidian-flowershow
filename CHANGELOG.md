@@ -1,5 +1,11 @@
 # flowershow
 
+## 4.0.4
+
+### Patch Changes
+
+- Fix exclude patterns config and add rootDir config option.
+
 ## 4.0.3
 
 ### Patch Changes

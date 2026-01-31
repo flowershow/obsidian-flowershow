@@ -288,8 +288,7 @@ export default class Publisher {
     if (!existingSite) {
       const localFiles = this.app.vault.getFiles();
       for (const file of localFiles) {
-        const normalizedPath = this.normalizePath(file.path);
-        if (!this.isExcluded(normalizedPath)) {
+        if (!this.isExcluded(file.path)) {
           newFiles.push(file);
         }
       }
@@ -306,11 +305,11 @@ export default class Publisher {
       const fileMetadata: FileMetadata[] = [];
 
       for (const file of localFiles) {
-        const normalizedPath = this.normalizePath(file.path);
-
-        if (this.isExcluded(normalizedPath)) {
+        if (this.isExcluded(file.path)) {
           continue;
         }
+
+        const normalizedPath = this.normalizePath(file.path);
 
         let sha: string;
         if (this.isPlainTextExtension(file.extension)) {
@@ -337,18 +336,15 @@ export default class Publisher {
 
       // Categorize files
       for (const file of localFiles) {
-        const normalizedPath = this.normalizePath(file.path);
-
-        if (this.isExcluded(normalizedPath)) {
+        if (this.isExcluded(file.path)) {
           continue;
         }
+
+        const normalizedPath = this.normalizePath(file.path);
 
         if (syncResult.unchanged.includes(normalizedPath)) {
           unchangedFiles.push(file);
         } else if (syncResult.toUpdate.some((u) => u.path === normalizedPath)) {
-          // If it's in toUpload or toUpdate, determine if it's new or changed
-          // We'll treat all files in toUpload/toUpdate as either new or changed
-          // For now, we'll just put them in changedFiles
           changedFiles.push(file);
         } else if (syncResult.toUpload.some((u) => u.path === normalizedPath)) {
           newFiles.push(file);
@@ -359,10 +355,9 @@ export default class Publisher {
     } catch (error) {
       console.error("Error getting publish status:", error);
       // On error, treat all files as new
-      const localFiles = this.app.vault.getFiles();
-      for (const file of localFiles) {
-        const normalizedPath = this.normalizePath(file.path);
-        if (!this.isExcluded(normalizedPath)) {
+      const errorLocalFiles = this.app.vault.getFiles();
+      for (const file of errorLocalFiles) {
+        if (!this.isExcluded(file.path)) {
           newFiles.push(file);
         }
       }
@@ -372,7 +367,35 @@ export default class Publisher {
   }
 
   private normalizePath(p: string): string {
-    return p.replace(/^\/+/, "");
+    let normalizedPath = p.replace(/^\/+/, "");
+
+    // If rootDir is set, strip it from the path
+    if (this.settings.rootDir) {
+      const rootDirNormalized = this.settings.rootDir.replace(/^\/+|\/+$/g, "");
+      if (normalizedPath.startsWith(rootDirNormalized + "/")) {
+        normalizedPath = normalizedPath.slice(rootDirNormalized.length + 1);
+      } else if (normalizedPath === rootDirNormalized) {
+        normalizedPath = "";
+      }
+    }
+
+    return normalizedPath;
+  }
+
+  private isWithinRootDir(path: string): boolean {
+    // If no rootDir is set, all files are included
+    if (!this.settings.rootDir) {
+      return true;
+    }
+
+    const rootDirNormalized = this.settings.rootDir.replace(/^\/+|\/+$/g, "");
+    const pathNormalized = path.replace(/^\/+/, "");
+
+    // Check if path starts with rootDir
+    return (
+      pathNormalized.startsWith(rootDirNormalized + "/") ||
+      pathNormalized === rootDirNormalized
+    );
   }
 
   private isPlainTextExtension(ext: string): boolean {
@@ -395,6 +418,12 @@ export default class Publisher {
   }
 
   private isExcluded(path: string): boolean {
+    // First check if file is within rootDir
+    if (!this.isWithinRootDir(path)) {
+      return true;
+    }
+
+    // Then check exclude patterns
     return this.settings.excludePatterns?.some((pattern) => {
       try {
         const regex = new RegExp(pattern);
