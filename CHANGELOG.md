@@ -1,5 +1,11 @@
 # flowershow
 
+## 4.0.1
+
+### Patch Changes
+
+- Improve Publish Modal UX and remove Test Connection button.
+
 ## 4.0.0
 
 ### Major Changes

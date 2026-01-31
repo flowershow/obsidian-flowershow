@@ -6,458 +6,403 @@ import PublishStatusBar from "./PublishStatusBar";
 import { FlowershowClient, FileMetadata } from "./FlowershowClient";
 
 export interface PublishStatus {
-  unchangedFiles: Array<TFile>;
-  changedFiles: Array<TFile>;
-  newFiles: Array<TFile>;
-  deletedFiles: Array<string>;
+	unchangedFiles: Array<TFile>;
+	changedFiles: Array<TFile>;
+	newFiles: Array<TFile>;
+	deletedFiles: Array<string>;
 }
 
 export type PathToHashDict = { [key: string]: string };
 
 export default class Publisher {
-  private app: App;
-  private settings: IFlowershowSettings;
-  private publishStatusBar: PublishStatusBar;
-  private client: FlowershowClient;
-  private siteId: string | null = null;
-  private username: string | null = null;
+	private app: App;
+	private settings: IFlowershowSettings;
+	private publishStatusBar: PublishStatusBar;
+	private client: FlowershowClient;
+	private siteId: string | null = null;
+	private username: string | null = null;
 
-  constructor(
-    app: App,
-    settings: IFlowershowSettings,
-    publishStatusBar: PublishStatusBar,
-  ) {
-    this.app = app;
-    this.settings = settings;
-    this.publishStatusBar = publishStatusBar;
-    this.client = new FlowershowClient(API_URL, this.settings.flowershowToken);
-  }
+	constructor(
+		app: App,
+		settings: IFlowershowSettings,
+		publishStatusBar: PublishStatusBar
+	) {
+		this.app = app;
+		this.settings = settings;
+		this.publishStatusBar = publishStatusBar;
+		this.client = new FlowershowClient(API_URL, this.settings.flowershowToken);
+	}
 
-  /** Get username (cached or fetch) */
-  private async getUsername(): Promise<string> {
-    if (this.username) {
-      return this.username;
-    }
-    const userInfo = await this.client.getUserInfo();
-    this.username = userInfo.username!;
-    return this.username;
-  }
+	/** Get username (cached or fetch) */
+	private async getUsername(): Promise<string> {
+		if (this.username) {
+			return this.username;
+		}
+		const userInfo = await this.client.getUserInfo();
+		this.username = userInfo.username!;
+		return this.username;
+	}
 
-  /** Get site ID (may return null if site hasn't been created yet) */
-  async getSiteId(): Promise<string | null> {
-    if (this.siteId) {
-      return this.siteId;
-    }
+	/** Get site ID (may return null if site hasn't been created yet) */
+	async getSiteId(): Promise<string | null> {
+		if (this.siteId) {
+			return this.siteId;
+		}
 
-    // Try to get existing site
-    const username = await this.getUsername();
-    const existingSite = await this.client.getSiteByName(
-      username,
-      this.settings.siteName,
-    );
+		// Try to get existing site
+		const username = await this.getUsername();
+		const existingSite = await this.client.getSiteByName(
+			username,
+			this.settings.siteName
+		);
 
-    if (existingSite) {
-      this.siteId = existingSite.site.id;
-      return this.siteId;
-    }
+		if (existingSite) {
+			this.siteId = existingSite.site.id;
+			return this.siteId;
+		}
 
-    return null;
-  }
+		return null;
+	}
 
-  /** Test connection to Flowershow */
-  async testConnection(): Promise<{ success: boolean; message: string }> {
-    if (!this.settings.flowershowToken || !this.settings.siteName) {
-      return {
-        success: false,
-        message:
-          "Please fill in all Flowershow settings (token and site name).",
-      };
-    }
+	/** Get or create the site */
+	private async ensureSite(): Promise<string> {
+		if (this.siteId) {
+			return this.siteId;
+		}
 
-    // Validate token format
-    if (!this.settings.flowershowToken.startsWith("fs_pat_")) {
-      return {
-        success: false,
-        message:
-          "Invalid token format. Please use a Flowershow PAT token (starts with fs_pat_).",
-      };
-    }
+		// Try to get existing site first
+		const username = await this.getUsername();
+		const existingSite = await this.client.getSiteByName(
+			username,
+			this.settings.siteName
+		);
 
-    try {
-      // Try to get user info to validate token
-      const userInfo = await this.client.getUserInfo();
-      this.username = userInfo.username!;
+		if (existingSite) {
+			this.siteId = existingSite.site.id;
+			return this.siteId;
+		}
 
-      // Try to get or create the site
-      let site = await this.client.getSiteByName(
-        this.username,
-        this.settings.siteName,
-      );
+		// Create new site
+		const { site } = await this.client.createSite(this.settings.siteName);
+		this.siteId = site.id;
+		return this.siteId;
+	}
 
-      if (!site) {
-        return {
-          success: true,
-          message: `Connected as ${
-            userInfo.username || userInfo.email
-          }. Site '${
-            this.settings.siteName
-          }' will be created on first publish.`,
-        };
-      }
+	/**
+	 * Publish note and optionally its embeds
+	 * @returns Site URL and publish status
+	 */
+	async publishNote(
+		file: TFile,
+		withEmbeds = true
+	): Promise<{
+		siteUrl: string;
+		filesPublished: number;
+	}> {
+		const cachedFile = this.app.metadataCache.getCache(file.path);
+		if (!cachedFile) {
+			throw new FlowershowError(`Note file ${file.path} not found!`);
+		}
 
-      return {
-        success: true,
-        message: `Connected as ${userInfo.username || userInfo.email}. Site '${
-          this.settings.siteName
-        }' is ready.`,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        message: `Connection failed: ${error?.message ?? String(error)}`,
-      };
-    }
-  }
+		const frontmatter = cachedFile.frontmatter;
 
-  /** Get or create the site */
-  private async ensureSite(): Promise<string> {
-    if (this.siteId) {
-      return this.siteId;
-    }
+		if (frontmatter && !validatePublishFrontmatter(frontmatter)) {
+			throw new FlowershowError("Can't publish note with `publish: false`");
+		}
 
-    // Try to get existing site first
-    const username = await this.getUsername();
-    const existingSite = await this.client.getSiteByName(
-      username,
-      this.settings.siteName,
-    );
+		const filesToPublish: TFile[] = [file];
 
-    if (existingSite) {
-      this.siteId = existingSite.site.id;
-      return this.siteId;
-    }
+		// Check frontmatter for image and avatar fields with wikilinks
+		if (frontmatter) {
+			const imageFields = ["image", "avatar"];
+			const wikilinkRegex = /^\[\[([^\]]+)\]\]$/;
 
-    // Create new site
-    const { site } = await this.client.createSite(this.settings.siteName);
-    this.siteId = site.id;
-    return this.siteId;
-  }
+			for (const field of imageFields) {
+				if (typeof frontmatter[field] === "string") {
+					const match = frontmatter[field].match(wikilinkRegex);
+					if (match) {
+						const link = match[1];
+						const imageFile = this.app.metadataCache.getFirstLinkpathDest(
+							link,
+							file.path
+						);
+						if (
+							imageFile &&
+							!filesToPublish.some((f) => f.path === imageFile.path)
+						) {
+							filesToPublish.push(imageFile);
+						}
+					}
+				}
+			}
+		}
 
-  /**
-   * Publish note and optionally its embeds
-   * @returns Site URL and publish status
-   */
-  async publishNote(
-    file: TFile,
-    withEmbeds = true,
-  ): Promise<{
-    siteUrl: string;
-    filesPublished: number;
-  }> {
-    const cachedFile = this.app.metadataCache.getCache(file.path);
-    if (!cachedFile) {
-      throw new FlowershowError(`Note file ${file.path} not found!`);
-    }
+		if (withEmbeds) {
+			// Track unique embeds
+			const uniqueEmbeds = new Map<string, TFile>();
 
-    const frontmatter = cachedFile.frontmatter;
+			const markdown = await this.app.vault.read(file);
+			cachedFile.embeds?.forEach((embed) => {
+				const embedTFile = this.app.metadataCache.getFirstLinkpathDest(
+					embed.link,
+					markdown
+				);
+				if (embedTFile && !uniqueEmbeds.has(embedTFile.path)) {
+					uniqueEmbeds.set(embedTFile.path, embedTFile);
+				}
+			});
 
-    if (frontmatter && !validatePublishFrontmatter(frontmatter)) {
-      throw new FlowershowError("Can't publish note with `publish: false`");
-    }
+			filesToPublish.push(...uniqueEmbeds.values());
+		}
 
-    const filesToPublish: TFile[] = [file];
+		// Publish batch
+		return await this.publishBatch({
+			filesToPublish,
+		});
+	}
 
-    // Check frontmatter for image and avatar fields with wikilinks
-    if (frontmatter) {
-      const imageFields = ["image", "avatar"];
-      const wikilinkRegex = /^\[\[([^\]]+)\]\]$/;
+	/**
+	 * Publish multiple files
+	 */
+	async publishBatch(opts: {
+		filesToPublish?: TFile[];
+		filesToDelete?: string[];
+	}): Promise<{
+		siteUrl: string;
+		filesPublished: number;
+	}> {
+		if (!opts.filesToPublish?.length && !opts.filesToDelete?.length) {
+			throw new FlowershowError("No files to delete or publish provided");
+		}
 
-      for (const field of imageFields) {
-        if (typeof frontmatter[field] === "string") {
-          const match = frontmatter[field].match(wikilinkRegex);
-          if (match) {
-            const link = match[1];
-            const imageFile = this.app.metadataCache.getFirstLinkpathDest(
-              link,
-              file.path,
-            );
-            if (
-              imageFile &&
-              !filesToPublish.some((f) => f.path === imageFile.path)
-            ) {
-              filesToPublish.push(imageFile);
-            }
-          }
-        }
-      }
-    }
+		this.publishStatusBar.start({
+			publishTotal: opts.filesToPublish?.length,
+			deleteTotal: opts.filesToDelete?.length,
+		});
 
-    if (withEmbeds) {
-      // Track unique embeds
-      const uniqueEmbeds = new Map<string, TFile>();
+		try {
+			// Ensure site exists
+			const siteId = await this.ensureSite();
 
-      const markdown = await this.app.vault.read(file);
-      cachedFile.embeds?.forEach((embed) => {
-        const embedTFile = this.app.metadataCache.getFirstLinkpathDest(
-          embed.link,
-          markdown,
-        );
-        if (embedTFile && !uniqueEmbeds.has(embedTFile.path)) {
-          uniqueEmbeds.set(embedTFile.path, embedTFile);
-        }
-      });
+			// Handle file deletions first if any
+			if (opts.filesToDelete && opts.filesToDelete.length > 0) {
+				await this.client.deleteFiles(siteId, opts.filesToDelete);
+				this.publishStatusBar.incrementDelete();
+			}
 
-      filesToPublish.push(...uniqueEmbeds.values());
-    }
+			// Handle file publishing
+			if (opts.filesToPublish && opts.filesToPublish.length > 0) {
+				// Prepare file metadata for selected files only
+				const fileMetadata: FileMetadata[] = [];
+				const filesToProcess = opts.filesToPublish;
 
-    // Publish batch
-    return await this.publishBatch({
-      filesToPublish,
-    });
-  }
+				for (const file of filesToProcess) {
+					const normalizedPath = this.normalizePath(file.path);
 
-  /**
-   * Publish multiple files
-   */
-  async publishBatch(opts: {
-    filesToPublish?: TFile[];
-    filesToDelete?: string[];
-  }): Promise<{
-    siteUrl: string;
-    filesPublished: number;
-  }> {
-    if (!opts.filesToPublish?.length && !opts.filesToDelete?.length) {
-      throw new FlowershowError("No files to delete or publish provided");
-    }
+					// Calculate SHA
+					let sha: string;
+					if (this.isPlainTextExtension(file.extension)) {
+						const text = await this.app.vault.cachedRead(file);
+						sha = await calculateTextSha(text);
+					} else {
+						const bytes = await this.app.vault.readBinary(file);
+						sha = await calculateFileSha(bytes);
+					}
 
-    this.publishStatusBar.start({
-      publishTotal: opts.filesToPublish?.length,
-      deleteTotal: opts.filesToDelete?.length,
-    });
+					fileMetadata.push({
+						path: normalizedPath,
+						size: file.stat.size,
+						sha,
+					});
+				}
 
-    try {
-      // Ensure site exists
-      const siteId = await this.ensureSite();
+				// Publish specific files (doesn't affect other files)
+				const publishResult = await this.client.publishFiles(
+					siteId,
+					fileMetadata
+				);
 
-      // Handle file deletions first if any
-      if (opts.filesToDelete && opts.filesToDelete.length > 0) {
-        await this.client.deleteFiles(siteId, opts.filesToDelete);
-        this.publishStatusBar.incrementDelete();
-      }
+				// Upload files to R2
+				for (const uploadInfo of publishResult.files) {
+					const file = filesToProcess.find(
+						(f) => this.normalizePath(f.path) === uploadInfo.path
+					);
+					if (!file) continue;
 
-      // Handle file publishing
-      if (opts.filesToPublish && opts.filesToPublish.length > 0) {
-        // Prepare file metadata for selected files only
-        const fileMetadata: FileMetadata[] = [];
-        const filesToProcess = opts.filesToPublish;
+					let content: ArrayBuffer | Uint8Array;
+					if (this.isPlainTextExtension(file.extension)) {
+						const text = await this.app.vault.cachedRead(file);
+						content = new TextEncoder().encode(text);
+					} else {
+						const bytes = await this.app.vault.readBinary(file);
+						content = bytes;
+					}
 
-        for (const file of filesToProcess) {
-          const normalizedPath = this.normalizePath(file.path);
+					await this.client.uploadToR2(
+						uploadInfo.uploadUrl,
+						content,
+						uploadInfo.contentType
+					);
 
-          // Calculate SHA
-          let sha: string;
-          if (this.isPlainTextExtension(file.extension)) {
-            const text = await this.app.vault.cachedRead(file);
-            sha = await calculateTextSha(text);
-          } else {
-            const bytes = await this.app.vault.readBinary(file);
-            sha = await calculateFileSha(bytes);
-          }
+					this.publishStatusBar.incrementPublish();
+				}
+			}
 
-          fileMetadata.push({
-            path: normalizedPath,
-            size: file.stat.size,
-            sha,
-          });
-        }
+			this.publishStatusBar.finish(2000);
 
-        // Publish specific files (doesn't affect other files)
-        const publishResult = await this.client.publishFiles(
-          siteId,
-          fileMetadata,
-        );
+			// Get site info to return URL
+			const username = await this.getUsername();
+			const site = await this.client.getSiteByName(
+				username,
+				this.settings.siteName
+			);
+			const siteUrl = site?.site.url || "";
 
-        // Upload files to R2
-        for (const uploadInfo of publishResult.files) {
-          const file = filesToProcess.find(
-            (f) => this.normalizePath(f.path) === uploadInfo.path,
-          );
-          if (!file) continue;
+			return {
+				siteUrl,
+				filesPublished:
+					(opts.filesToPublish?.length || 0) +
+					(opts.filesToDelete?.length || 0),
+			};
+		} catch (error) {
+			this.publishStatusBar.finish(0);
+			throw error;
+		}
+	}
 
-          let content: ArrayBuffer | Uint8Array;
-          if (this.isPlainTextExtension(file.extension)) {
-            const text = await this.app.vault.cachedRead(file);
-            content = new TextEncoder().encode(text);
-          } else {
-            const bytes = await this.app.vault.readBinary(file);
-            content = bytes;
-          }
+	/** Get publish status */
+	async getPublishStatus(): Promise<PublishStatus> {
+		const unchangedFiles: Array<TFile> = [];
+		const changedFiles: Array<TFile> = [];
+		const deletedFiles: Array<string> = [];
+		const newFiles: Array<TFile> = [];
 
-          await this.client.uploadToR2(
-            uploadInfo.uploadUrl,
-            content,
-            uploadInfo.contentType,
-          );
+		// Check if site exists without creating it
+		const username = await this.getUsername();
+		const existingSite = await this.client.getSiteByName(
+			username,
+			this.settings.siteName
+		);
 
-          this.publishStatusBar.incrementPublish();
-        }
-      }
+		// If site doesn't exist, all local files are new
+		if (!existingSite) {
+			const localFiles = this.app.vault.getFiles();
+			for (const file of localFiles) {
+				const normalizedPath = this.normalizePath(file.path);
+				if (!this.isExcluded(normalizedPath)) {
+					newFiles.push(file);
+				}
+			}
+			return { unchangedFiles, changedFiles, deletedFiles, newFiles };
+		}
 
-      this.publishStatusBar.finish(2000);
+		// Site exists, get status from server using dry-run mode
+		const siteId = existingSite.site.id;
+		this.siteId = siteId; // Cache it
 
-      // Get site info to return URL
-      const username = await this.getUsername();
-      const site = await this.client.getSiteByName(
-        username,
-        this.settings.siteName,
-      );
-      const siteUrl = site?.site.url || "";
+		try {
+			// Get local files
+			const localFiles = this.app.vault.getFiles();
+			const fileMetadata: FileMetadata[] = [];
 
-      return {
-        siteUrl,
-        filesPublished:
-          (opts.filesToPublish?.length || 0) +
-          (opts.filesToDelete?.length || 0),
-      };
-    } catch (error) {
-      this.publishStatusBar.finish(0);
-      throw error;
-    }
-  }
+			for (const file of localFiles) {
+				const normalizedPath = this.normalizePath(file.path);
 
-  /** Get publish status */
-  async getPublishStatus(): Promise<PublishStatus> {
-    const unchangedFiles: Array<TFile> = [];
-    const changedFiles: Array<TFile> = [];
-    const deletedFiles: Array<string> = [];
-    const newFiles: Array<TFile> = [];
+				if (this.isExcluded(normalizedPath)) {
+					continue;
+				}
 
-    // Check if site exists without creating it
-    const username = await this.getUsername();
-    const existingSite = await this.client.getSiteByName(
-      username,
-      this.settings.siteName,
-    );
+				let sha: string;
+				if (this.isPlainTextExtension(file.extension)) {
+					const text = await this.app.vault.cachedRead(file);
+					sha = await calculateTextSha(text);
+				} else {
+					const bytes = await this.app.vault.readBinary(file);
+					sha = await calculateFileSha(bytes);
+				}
 
-    // If site doesn't exist, all local files are new
-    if (!existingSite) {
-      const localFiles = this.app.vault.getFiles();
-      for (const file of localFiles) {
-        const normalizedPath = this.normalizePath(file.path);
-        if (!this.isExcluded(normalizedPath)) {
-          newFiles.push(file);
-        }
-      }
-      return { unchangedFiles, changedFiles, deletedFiles, newFiles };
-    }
+				fileMetadata.push({
+					path: normalizedPath,
+					size: file.stat.size,
+					sha,
+				});
+			}
 
-    // Site exists, get status from server using dry-run mode
-    const siteId = existingSite.site.id;
-    this.siteId = siteId; // Cache it
+			// Use dry-run mode to see what would change without making any changes
+			const syncResult = await this.client.syncFiles(
+				siteId,
+				fileMetadata,
+				true
+			);
 
-    try {
-      // Get local files
-      const localFiles = this.app.vault.getFiles();
-      const fileMetadata: FileMetadata[] = [];
+			// Categorize files
+			for (const file of localFiles) {
+				const normalizedPath = this.normalizePath(file.path);
 
-      for (const file of localFiles) {
-        const normalizedPath = this.normalizePath(file.path);
+				if (this.isExcluded(normalizedPath)) {
+					continue;
+				}
 
-        if (this.isExcluded(normalizedPath)) {
-          continue;
-        }
+				if (syncResult.unchanged.includes(normalizedPath)) {
+					unchangedFiles.push(file);
+				} else if (syncResult.toUpdate.some((u) => u.path === normalizedPath)) {
+					// If it's in toUpload or toUpdate, determine if it's new or changed
+					// We'll treat all files in toUpload/toUpdate as either new or changed
+					// For now, we'll just put them in changedFiles
+					changedFiles.push(file);
+				} else if (syncResult.toUpload.some((u) => u.path === normalizedPath)) {
+					newFiles.push(file);
+				}
+			}
 
-        let sha: string;
-        if (this.isPlainTextExtension(file.extension)) {
-          const text = await this.app.vault.cachedRead(file);
-          sha = await calculateTextSha(text);
-        } else {
-          const bytes = await this.app.vault.readBinary(file);
-          sha = await calculateFileSha(bytes);
-        }
+			deletedFiles.push(...syncResult.deleted);
+		} catch (error) {
+			console.error("Error getting publish status:", error);
+			// On error, treat all files as new
+			const localFiles = this.app.vault.getFiles();
+			for (const file of localFiles) {
+				const normalizedPath = this.normalizePath(file.path);
+				if (!this.isExcluded(normalizedPath)) {
+					newFiles.push(file);
+				}
+			}
+		}
 
-        fileMetadata.push({
-          path: normalizedPath,
-          size: file.stat.size,
-          sha,
-        });
-      }
+		return { unchangedFiles, changedFiles, deletedFiles, newFiles };
+	}
 
-      // Use dry-run mode to see what would change without making any changes
-      const syncResult = await this.client.syncFiles(
-        siteId,
-        fileMetadata,
-        true,
-      );
+	private normalizePath(p: string): string {
+		return p.replace(/^\/+/, "");
+	}
 
-      // Categorize files
-      for (const file of localFiles) {
-        const normalizedPath = this.normalizePath(file.path);
+	private isPlainTextExtension(ext: string): boolean {
+		const plainTextExtensions = [
+			"md",
+			"mdx",
+			"txt",
+			"json",
+			"yaml",
+			"yml",
+			"css",
+			"js",
+			"ts",
+			"html",
+			"xml",
+			"csv",
+			"tsv",
+		];
+		return plainTextExtensions.includes(ext.toLowerCase());
+	}
 
-        if (this.isExcluded(normalizedPath)) {
-          continue;
-        }
-
-        if (syncResult.unchanged.includes(normalizedPath)) {
-          unchangedFiles.push(file);
-        } else if (syncResult.toUpdate.some((u) => u.path === normalizedPath)) {
-          // If it's in toUpload or toUpdate, determine if it's new or changed
-          // We'll treat all files in toUpload/toUpdate as either new or changed
-          // For now, we'll just put them in changedFiles
-          changedFiles.push(file);
-        } else if (syncResult.toUpload.some((u) => u.path === normalizedPath)) {
-          newFiles.push(file);
-        }
-      }
-
-      deletedFiles.push(...syncResult.deleted);
-    } catch (error) {
-      console.error("Error getting publish status:", error);
-      // On error, treat all files as new
-      const localFiles = this.app.vault.getFiles();
-      for (const file of localFiles) {
-        const normalizedPath = this.normalizePath(file.path);
-        if (!this.isExcluded(normalizedPath)) {
-          newFiles.push(file);
-        }
-      }
-    }
-
-    return { unchangedFiles, changedFiles, deletedFiles, newFiles };
-  }
-
-  private normalizePath(p: string): string {
-    return p.replace(/^\/+/, "");
-  }
-
-  private isPlainTextExtension(ext: string): boolean {
-    const plainTextExtensions = [
-      "md",
-      "mdx",
-      "txt",
-      "json",
-      "yaml",
-      "yml",
-      "css",
-      "js",
-      "ts",
-      "html",
-      "xml",
-      "csv",
-      "tsv",
-    ];
-    return plainTextExtensions.includes(ext.toLowerCase());
-  }
-
-  private isExcluded(path: string): boolean {
-    return this.settings.excludePatterns?.some((pattern) => {
-      try {
-        const regex = new RegExp(pattern);
-        return regex.test(path);
-      } catch (e) {
-        console.error(`Invalid regex pattern: ${pattern}`, e);
-        return false;
-      }
-    });
-  }
+	private isExcluded(path: string): boolean {
+		return this.settings.excludePatterns?.some((pattern) => {
+			try {
+				const regex = new RegExp(pattern);
+				return regex.test(path);
+			} catch (e) {
+				console.error(`Invalid regex pattern: ${pattern}`, e);
+				return false;
+			}
+		});
+	}
 }
