@@ -1,5 +1,11 @@
 # flowershow
 
+## 4.0.7
+
+### Patch Changes
+
+- Default displayed site name to vault name.
+
 ## 4.0.6
 
 ### Patch Changes
