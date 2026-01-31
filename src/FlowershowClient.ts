@@ -90,7 +90,6 @@ export class FlowershowClient {
     endpoint: string,
     options: RequestInit = {},
   ): Promise<Response> {
-    console.log("API token:", this.token);
     const url = `${this.apiUrl}${endpoint}`;
     const headers = {
       ...options.headers,
@@ -151,7 +150,6 @@ export class FlowershowClient {
     username: string,
     siteName: string,
   ): Promise<{ site: Site } | null> {
-    console.log("Fetching site for:", username, siteName);
     const response = await this.apiRequest(
       `/api/sites/${username}/${siteName}`,
     );

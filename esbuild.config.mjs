@@ -21,11 +21,11 @@ esbuild
     format: "cjs",
     watch: !prod,
     target: "es2016",
+    jsx: "automatic",
     logLevel: "info",
     sourcemap: prod ? false : "inline",
     treeShaking: true,
     outfile: "main.js",
-    drop: prod ? ["console"] : [],
     define: {
       "process.env.FLOWERSHOW_API_URL": JSON.stringify(
         process.env.FLOWERSHOW_API_URL || "https://cloud.flowershow.app",

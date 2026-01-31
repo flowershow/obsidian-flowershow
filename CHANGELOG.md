@@ -1,5 +1,11 @@
 # flowershow
 
+## 4.0.6
+
+### Patch Changes
+
+- Fix esbuild config and rm unneeded console logs.
+
 ## 4.0.5
 
 ### Patch Changes
