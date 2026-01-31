@@ -1,5 +1,11 @@
 # flowershow
 
+## 4.0.3
+
+### Patch Changes
+
+- Show update info in a modal.
+
 ## 4.0.2
 
 ### Patch Changes

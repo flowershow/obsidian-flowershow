@@ -11,6 +11,7 @@ import { IFlowershowSettings, DEFAULT_SETTINGS } from "src/settings";
 import Publisher from "src/Publisher";
 import PublishStatusBar from "src/PublishStatusBar";
 import { PublishStatusModal } from "src/components/PublishStatusModal";
+import { UpdateModal } from "src/components/UpdateModal";
 import SettingView from "src/SettingView";
 
 import { flowershowIcon } from "src/constants";
@@ -38,6 +39,9 @@ export default class Flowershow extends Plugin {
 		this.logStartupEvent("Plugin Constructor ready, starting onload()");
 
 		await this.loadSettings();
+
+		// Show update modal for users who haven't seen v4.0 changes
+		this.showUpdateModalIfNeeded();
 
 		this.statusBarItem = this.addStatusBarItem();
 		this.statusBarItem.addClass("mod-clickable");
@@ -195,6 +199,21 @@ export default class Flowershow extends Plugin {
 			}ms\n`
 		);
 		this.lastLogTimestamp = timestamp;
+	}
+
+	private showUpdateModalIfNeeded() {
+		// Show modal if user hasn't seen any version yet (new user or upgrading from pre-4.0)
+		if (
+			!this.settings.lastSeenVersion ||
+			this.settings.lastSeenVersion < "4.0.0"
+		) {
+			const modal = new UpdateModal(this.app, async () => {
+				// Save current version after modal is closed
+				this.settings.lastSeenVersion = this.manifest.version;
+				await this.saveSettings();
+			});
+			modal.open();
+		}
 	}
 }
 
