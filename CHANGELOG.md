@@ -1,5 +1,11 @@
 # flowershow
 
+## 4.0.9
+
+### Patch Changes
+
+- Don't publish files with `publish: false`.
+
 ## 4.0.8
 
 ### Patch Changes

@@ -293,7 +293,7 @@ export default class Publisher {
     if (!existingSite) {
       const localFiles = this.app.vault.getFiles();
       for (const file of localFiles) {
-        if (!this.isExcluded(file.path)) {
+        if (!this.isExcluded(file.path) && !this.hasPublishFalse(file)) {
           newFiles.push(file);
         }
       }
@@ -310,7 +310,7 @@ export default class Publisher {
       const fileMetadata: FileMetadata[] = [];
 
       for (const file of localFiles) {
-        if (this.isExcluded(file.path)) {
+        if (this.isExcluded(file.path) || this.hasPublishFalse(file)) {
           continue;
         }
 
@@ -341,7 +341,7 @@ export default class Publisher {
 
       // Categorize files
       for (const file of localFiles) {
-        if (this.isExcluded(file.path)) {
+        if (this.isExcluded(file.path) || this.hasPublishFalse(file)) {
           continue;
         }
 
@@ -362,7 +362,7 @@ export default class Publisher {
       // On error, treat all files as new
       const errorLocalFiles = this.app.vault.getFiles();
       for (const file of errorLocalFiles) {
-        if (!this.isExcluded(file.path)) {
+        if (!this.isExcluded(file.path) && !this.hasPublishFalse(file)) {
           newFiles.push(file);
         }
       }
@@ -438,5 +438,14 @@ export default class Publisher {
         return false;
       }
     });
+  }
+
+  /** Check if a file has publish: false in frontmatter */
+  private hasPublishFalse(file: TFile): boolean {
+    if (file.extension !== "md" && file.extension !== "mdx") {
+      return false;
+    }
+    const cachedFile = this.app.metadataCache.getCache(file.path);
+    return cachedFile?.frontmatter?.["publish"] === false;
   }
 }
