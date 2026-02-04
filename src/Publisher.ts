@@ -1,9 +1,18 @@
 import { App, TFile } from "obsidian";
 import { IFlowershowSettings, API_URL } from "./settings";
-import { validatePublishFrontmatter } from "./Validator";
-import { FlowershowError, calculateFileSha, calculateTextSha } from "./utils";
+import {
+  FlowershowError,
+  calculateFileSha,
+  calculateTextSha,
+  isPlainTextExtension,
+} from "./utils";
 import PublishStatusBar from "./PublishStatusBar";
 import { FlowershowClient, FileMetadata } from "./FlowershowClient";
+import {
+  normalizePath,
+  shouldSkipFile,
+  validatePublishFrontmatter,
+} from "./utils/publisherHelpers";
 
 export interface PublishStatus {
   unchangedFiles: Array<TFile>;
@@ -38,8 +47,9 @@ export default class Publisher {
     return this.settings.siteName || this.app.vault.getName();
   }
 
-  /** Get username (cached or fetch) */
+  /** Get username */
   private async getUsername(): Promise<string> {
+    // (cached)
     if (this.username) {
       return this.username;
     }
@@ -50,6 +60,7 @@ export default class Publisher {
 
   /** Get site ID (may return null if site hasn't been created yet) */
   async getSiteId(): Promise<string | null> {
+    // (cached)
     if (this.siteId) {
       return this.siteId;
     }
@@ -71,20 +82,9 @@ export default class Publisher {
 
   /** Get or create the site */
   private async ensureSite(): Promise<string> {
-    if (this.siteId) {
-      return this.siteId;
-    }
-
-    // Try to get existing site first
-    const username = await this.getUsername();
-    const existingSite = await this.client.getSiteByName(
-      username,
-      this.getSiteName(),
-    );
-
-    if (existingSite) {
-      this.siteId = existingSite.site.id;
-      return this.siteId;
+    const existingSiteId = await this.getSiteId();
+    if (existingSiteId) {
+      return existingSiteId;
     }
 
     // Create new site
@@ -97,7 +97,7 @@ export default class Publisher {
    * Publish note and optionally its embeds
    * @returns Site URL and publish status
    */
-  async publishNote(
+  async publishSingleNoteWithEmbeds(
     file: TFile,
     withEmbeds = true,
   ): Promise<{
@@ -117,31 +117,6 @@ export default class Publisher {
 
     const filesToPublish: TFile[] = [file];
 
-    // Check frontmatter for image and avatar fields with wikilinks
-    if (frontmatter) {
-      const imageFields = ["image", "avatar"];
-      const wikilinkRegex = /^\[\[([^\]]+)\]\]$/;
-
-      for (const field of imageFields) {
-        if (typeof frontmatter[field] === "string") {
-          const match = frontmatter[field].match(wikilinkRegex);
-          if (match) {
-            const link = match[1];
-            const imageFile = this.app.metadataCache.getFirstLinkpathDest(
-              link,
-              file.path,
-            );
-            if (
-              imageFile &&
-              !filesToPublish.some((f) => f.path === imageFile.path)
-            ) {
-              filesToPublish.push(imageFile);
-            }
-          }
-        }
-      }
-    }
-
     if (withEmbeds) {
       // Track unique embeds
       const uniqueEmbeds = new Map<string, TFile>();
@@ -160,7 +135,6 @@ export default class Publisher {
       filesToPublish.push(...uniqueEmbeds.values());
     }
 
-    // Publish batch
     return await this.publishBatch({
       filesToPublish,
     });
@@ -191,7 +165,27 @@ export default class Publisher {
 
       // Handle file deletions first if any
       if (opts.filesToDelete && opts.filesToDelete.length > 0) {
-        await this.client.deleteFiles(siteId, opts.filesToDelete);
+        // Normalize paths before deletion
+        const normalizedPathsToDelete = opts.filesToDelete.map((path) =>
+          normalizePath(path, this.settings.rootDir),
+        );
+
+        const deleteResult = await this.client.deleteFiles(
+          siteId,
+          normalizedPathsToDelete,
+        );
+
+        // Check if any files were not found
+        if (deleteResult.notFound.length > 0) {
+          throw new FlowershowError(
+            `Failed to delete ${
+              deleteResult.notFound.length
+            } file(s): ${deleteResult.notFound.join(
+              ", ",
+            )}. Files not found on server.`,
+          );
+        }
+
         this.publishStatusBar.incrementDelete();
       }
 
@@ -202,11 +196,14 @@ export default class Publisher {
         const filesToProcess = opts.filesToPublish;
 
         for (const file of filesToProcess) {
-          const normalizedPath = this.normalizePath(file.path);
+          const normalizedPath = normalizePath(
+            file.path,
+            this.settings.rootDir,
+          );
 
           // Calculate SHA
           let sha: string;
-          if (this.isPlainTextExtension(file.extension)) {
+          if (isPlainTextExtension(file.extension)) {
             const text = await this.app.vault.cachedRead(file);
             sha = await calculateTextSha(text);
           } else {
@@ -230,12 +227,13 @@ export default class Publisher {
         // Upload files to R2
         for (const uploadInfo of publishResult.files) {
           const file = filesToProcess.find(
-            (f) => this.normalizePath(f.path) === uploadInfo.path,
+            (f) =>
+              normalizePath(f.path, this.settings.rootDir) === uploadInfo.path,
           );
           if (!file) continue;
 
           let content: ArrayBuffer | Uint8Array;
-          if (this.isPlainTextExtension(file.extension)) {
+          if (isPlainTextExtension(file.extension)) {
             const text = await this.app.vault.cachedRead(file);
             content = new TextEncoder().encode(text);
           } else {
@@ -293,7 +291,14 @@ export default class Publisher {
     if (!existingSite) {
       const localFiles = this.app.vault.getFiles();
       for (const file of localFiles) {
-        if (!this.isExcluded(file.path) && !this.hasPublishFalse(file)) {
+        if (
+          !shouldSkipFile(
+            file,
+            this.app,
+            this.settings.rootDir,
+            this.settings.excludePatterns,
+          )
+        ) {
           newFiles.push(file);
         }
       }
@@ -310,14 +315,21 @@ export default class Publisher {
       const fileMetadata: FileMetadata[] = [];
 
       for (const file of localFiles) {
-        if (this.isExcluded(file.path) || this.hasPublishFalse(file)) {
+        if (
+          shouldSkipFile(
+            file,
+            this.app,
+            this.settings.rootDir,
+            this.settings.excludePatterns,
+          )
+        ) {
           continue;
         }
 
-        const normalizedPath = this.normalizePath(file.path);
+        const normalizedPath = normalizePath(file.path, this.settings.rootDir);
 
         let sha: string;
-        if (this.isPlainTextExtension(file.extension)) {
+        if (isPlainTextExtension(file.extension)) {
           const text = await this.app.vault.cachedRead(file);
           sha = await calculateTextSha(text);
         } else {
@@ -341,11 +353,18 @@ export default class Publisher {
 
       // Categorize files
       for (const file of localFiles) {
-        if (this.isExcluded(file.path) || this.hasPublishFalse(file)) {
+        if (
+          shouldSkipFile(
+            file,
+            this.app,
+            this.settings.rootDir,
+            this.settings.excludePatterns,
+          )
+        ) {
           continue;
         }
 
-        const normalizedPath = this.normalizePath(file.path);
+        const normalizedPath = normalizePath(file.path, this.settings.rootDir);
 
         if (syncResult.unchanged.includes(normalizedPath)) {
           unchangedFiles.push(file);
@@ -362,90 +381,19 @@ export default class Publisher {
       // On error, treat all files as new
       const errorLocalFiles = this.app.vault.getFiles();
       for (const file of errorLocalFiles) {
-        if (!this.isExcluded(file.path) && !this.hasPublishFalse(file)) {
+        if (
+          !shouldSkipFile(
+            file,
+            this.app,
+            this.settings.rootDir,
+            this.settings.excludePatterns,
+          )
+        ) {
           newFiles.push(file);
         }
       }
     }
 
     return { unchangedFiles, changedFiles, deletedFiles, newFiles };
-  }
-
-  private normalizePath(p: string): string {
-    let normalizedPath = p.replace(/^\/+/, "");
-
-    // If rootDir is set, strip it from the path
-    if (this.settings.rootDir) {
-      const rootDirNormalized = this.settings.rootDir.replace(/^\/+|\/+$/g, "");
-      if (normalizedPath.startsWith(rootDirNormalized + "/")) {
-        normalizedPath = normalizedPath.slice(rootDirNormalized.length + 1);
-      } else if (normalizedPath === rootDirNormalized) {
-        normalizedPath = "";
-      }
-    }
-
-    return normalizedPath;
-  }
-
-  private isWithinRootDir(path: string): boolean {
-    // If no rootDir is set, all files are included
-    if (!this.settings.rootDir) {
-      return true;
-    }
-
-    const rootDirNormalized = this.settings.rootDir.replace(/^\/+|\/+$/g, "");
-    const pathNormalized = path.replace(/^\/+/, "");
-
-    // Check if path starts with rootDir
-    return (
-      pathNormalized.startsWith(rootDirNormalized + "/") ||
-      pathNormalized === rootDirNormalized
-    );
-  }
-
-  private isPlainTextExtension(ext: string): boolean {
-    const plainTextExtensions = [
-      "md",
-      "mdx",
-      "txt",
-      "json",
-      "yaml",
-      "yml",
-      "css",
-      "js",
-      "ts",
-      "html",
-      "xml",
-      "csv",
-      "tsv",
-    ];
-    return plainTextExtensions.includes(ext.toLowerCase());
-  }
-
-  private isExcluded(path: string): boolean {
-    // First check if file is within rootDir
-    if (!this.isWithinRootDir(path)) {
-      return true;
-    }
-
-    // Then check exclude patterns
-    return this.settings.excludePatterns?.some((pattern) => {
-      try {
-        const regex = new RegExp(pattern);
-        return regex.test(path);
-      } catch (e) {
-        console.error(`Invalid regex pattern: ${pattern}`, e);
-        return false;
-      }
-    });
-  }
-
-  /** Check if a file has publish: false in frontmatter */
-  private hasPublishFalse(file: TFile): boolean {
-    if (file.extension !== "md" && file.extension !== "mdx") {
-      return false;
-    }
-    const cachedFile = this.app.metadataCache.getCache(file.path);
-    return cachedFile?.frontmatter?.["publish"] === false;
   }
 }

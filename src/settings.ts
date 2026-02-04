@@ -10,7 +10,7 @@ export interface IFlowershowSettings {
   flowershowToken: string; // Flowershow PAT token (fs_pat_...)
   siteName: string; // Project/site name
   rootDir: string; // Root directory to publish (empty = publish entire vault)
-  excludePatterns: string[]; // Array of regex patterns to exclude files/folders
+  excludePatterns: string[]; // Array of regex patterns to exclude files/folders (matched against full path from vault root)
   lastSeenVersion: string; // Last version user has seen (for update notifications)
 }
 

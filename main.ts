@@ -126,7 +126,8 @@ export default class Flowershow extends Plugin {
         return;
       }
       new Notice("⌛ Publishing note...");
-      const result = await this.publisher.publishNote(currentFile);
+      const result =
+        await this.publisher.publishSingleNoteWithEmbeds(currentFile);
       const frag = createSiteNotice(
         `Published ${result.filesPublished} file(s).`,
         result.siteUrl,

@@ -329,6 +329,7 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
       setSiteId(id);
       // Fetch publish status
       const status = await publisher.getPublishStatus();
+      console.log({ status });
       setPublishStatus(status);
       setPublishStatusResponseStatus("success");
       // Update the cache
@@ -361,6 +362,7 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
         } ${count} files...`,
       );
       const result = await action();
+      console.log({ result });
       const frag = document.createDocumentFragment();
       frag.append(
         document.createTextNode(

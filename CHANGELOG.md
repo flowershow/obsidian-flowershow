@@ -1,5 +1,11 @@
 # flowershow
 
+## 4.0.10
+
+### Patch Changes
+
+- Fix: broken unpublishing of selected files when `rootDir` is set.
+
 ## 4.0.9
 
 ### Patch Changes

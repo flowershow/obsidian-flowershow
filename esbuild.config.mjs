@@ -10,26 +10,32 @@ if you want to view the source, please visit the github repository of this plugi
 
 const prod = process.argv[2] === "production";
 
-esbuild
-  .build({
-    banner: {
-      js: banner,
-    },
-    entryPoints: ["main.ts"],
-    bundle: true,
-    external: ["obsidian", "electron", ...builtins],
-    format: "cjs",
-    watch: !prod,
-    target: "es2016",
-    jsx: "automatic",
-    logLevel: "info",
-    sourcemap: prod ? false : "inline",
-    treeShaking: true,
-    outfile: "main.js",
-    define: {
-      "process.env.FLOWERSHOW_API_URL": JSON.stringify(
-        process.env.FLOWERSHOW_API_URL || "https://cloud.flowershow.app",
-      ),
-    },
-  })
-  .catch(() => process.exit(1));
+const buildOptions = {
+  banner: {
+    js: banner,
+  },
+  entryPoints: ["main.ts"],
+  bundle: true,
+  external: ["obsidian", "electron", ...builtins],
+  format: "cjs",
+  target: "es2016",
+  jsx: "automatic",
+  logLevel: "info",
+  sourcemap: prod ? false : "inline",
+  treeShaking: true,
+  outfile: "main.js",
+  define: {
+    "process.env.FLOWERSHOW_API_URL": JSON.stringify(
+      process.env.FLOWERSHOW_API_URL || "https://cloud.flowershow.app",
+    ),
+  },
+};
+
+if (prod) {
+  esbuild.build(buildOptions).catch(() => process.exit(1));
+} else {
+  esbuild
+    .context(buildOptions)
+    .then((ctx) => ctx.watch())
+    .catch(() => process.exit(1));
+}

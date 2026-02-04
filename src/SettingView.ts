@@ -178,7 +178,7 @@ export default class SettingView {
     new Setting(settingContainer)
       .setName("Exclude Patterns")
       .setDesc(
-        "Regex patterns to exclude files and folders from publishing. One pattern per line.",
+        "Regex patterns to exclude files and folders from publishing. One pattern per line. Patterns match against the full path from vault root.",
       )
       .addTextArea((textarea) => {
         textarea
@@ -203,9 +203,12 @@ export default class SettingView {
       cls: "setting-item-description",
     });
     helpText.innerHTML = `
+      <strong>Note:</strong> Patterns match against full paths from vault root.<br>
       Examples:<br>
-      • <code>^private/</code> - Exclude private directory<br>
-      • <code>\\.excalidraw\\.md$</code> - Exclude Excalidraw files
+      • <code>^private/</code> - Exclude the "private" folder at vault root<br>
+      • <code>^blog/drafts/</code> - Exclude "drafts" folder inside "blog" folder<br>
+      • <code>\\.excalidraw\\.md$</code> - Exclude all Excalidraw files<br>
+      • <code>\\.tmp$</code> - Exclude all .tmp files anywhere in vault
     `;
   }
 }
