@@ -1,7 +1,7 @@
 {
   "name": "flowershow",
-  "version": "4.0.10",
-  "description": "Obsidian Flowershow plugin for publishing with Flowershow direct from your obsidian vault.",
+  "version": "4.0.11",
+  "description": "Obsidian Flowershow plugin for publishing with Flowershow directly from your Obsidian vault.",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",

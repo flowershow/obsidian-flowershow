@@ -1,4 +1,4 @@
-# 💐 Obsidian Flowershow Plugin
+# 💐 Publish with Flowershow (Obsidian Plugin)
 
 Publish your Obsidian vault online easily, quickly and for free directly from your Obsidian vault using [Flowershow](https://flowershow.app).
 

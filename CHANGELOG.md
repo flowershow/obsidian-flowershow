@@ -1,5 +1,12 @@
 # flowershow
 
+## 4.0.11
+
+### Patch Changes
+
+- Add `X-Flowershow-Plugin-Version` header to API requests for server-side tracking.
+- Rename plugin to "Publish with Flowershow"
+
 ## 4.0.10
 
 ### Patch Changes

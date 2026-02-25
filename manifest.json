@@ -1,9 +1,9 @@
 {
   "id": "flowershow",
-  "name": "Flowershow",
-  "version": "4.0.10",
+  "name": "Publish with Flowershow",
+  "version": "4.0.11",
   "minAppVersion": "0.15.0",
-  "description": "Publish with Flowershow directly from your Obsidian vault.",
+  "description": "Publish your vault as a website with Flowershow.",
   "author": "Flowershow",
   "authorUrl": "https://flowershow.app/",
   "isDesktopOnly": false

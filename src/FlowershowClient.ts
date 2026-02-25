@@ -94,6 +94,7 @@ export class FlowershowClient {
     const headers = {
       ...options.headers,
       Authorization: `Bearer ${this.token}`,
+      "X-Flowershow-Plugin-Version": process.env.FLOWERSHOW_PLUGIN_VERSION!,
     };
 
     return fetch(url, {
