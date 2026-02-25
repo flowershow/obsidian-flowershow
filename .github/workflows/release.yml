@@ -2,53 +2,37 @@ name: Release Obsidian Plugin
 
 on:
   push:
-    tags:
-      - "*"
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency: release-${{ github.ref }}
 
 jobs:
-  build:
+  release:
+    name: Release
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Use Node.js
-        uses: actions/setup-node@v3
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@v4
         with:
           node-version: "22.x"
 
-      - name: Check versions match
-        run: |
-          tag="${GITHUB_REF#refs/tags/}"
-          pkg_version=$(node -p "require('./package.json').version")
-          manifest_version=$(node -p "require('./manifest.json').version")
-          
-          if [ "$tag" != "$pkg_version" ]; then
-            echo "Error: Git tag ($tag) does not match version in package.json ($pkg_version)"
-            exit 1
-          fi
-          
-          if [ "$tag" != "$manifest_version" ]; then
-            echo "Error: Git tag ($tag) does not match version in manifest.json ($manifest_version)"
-            exit 1
-          fi
-          
-          echo "Versions match: $tag"
+      - name: Install Dependencies
+        run: npm install
 
-      - name: Build
-        id: build
-        run: |
-          npm install
-          npm run build
-
-      - name: Create release
+      - name: Create Release Pull Request or Publish
+        uses: changesets/action@v1
+        with:
+          version: npx changeset version && node version-bump.mjs
+          publish: npm run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          tag="${GITHUB_REF#refs/tags/}"
-
-          gh release create "$tag" \
-            --title="$tag" \
-            --draft \
-            main.js manifest.json styles.css
