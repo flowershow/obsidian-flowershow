@@ -26,7 +26,7 @@ export type PathToHashDict = { [key: string]: string };
 export default class Publisher {
   private app: App;
   private settings: IFlowershowSettings;
-  private publishStatusBar: PublishStatusBar;
+  private publishStatusBar: PublishStatusBar | undefined;
   private client: FlowershowClient;
   private siteId: string | null = null;
   private username: string | null = null;
@@ -34,7 +34,7 @@ export default class Publisher {
   constructor(
     app: App,
     settings: IFlowershowSettings,
-    publishStatusBar: PublishStatusBar,
+    publishStatusBar: PublishStatusBar | undefined,
   ) {
     this.app = app;
     this.settings = settings;
@@ -154,7 +154,7 @@ export default class Publisher {
       throw new FlowershowError("No files to delete or publish provided");
     }
 
-    this.publishStatusBar.start({
+    this.publishStatusBar?.start({
       publishTotal: opts.filesToPublish?.length,
       deleteTotal: opts.filesToDelete?.length,
     });
@@ -186,7 +186,7 @@ export default class Publisher {
           );
         }
 
-        this.publishStatusBar.incrementDelete();
+        this.publishStatusBar?.incrementDelete();
       }
 
       // Handle file publishing
@@ -247,11 +247,11 @@ export default class Publisher {
             uploadInfo.contentType,
           );
 
-          this.publishStatusBar.incrementPublish();
+          this.publishStatusBar?.incrementPublish();
         }
       }
 
-      this.publishStatusBar.finish(2000);
+      this.publishStatusBar?.finish(2000);
 
       // Get site info to return URL
       const username = await this.getUsername();
@@ -268,7 +268,7 @@ export default class Publisher {
           (opts.filesToDelete?.length || 0),
       };
     } catch (error) {
-      this.publishStatusBar.finish(0);
+      this.publishStatusBar?.finish(0);
       throw error;
     }
   }

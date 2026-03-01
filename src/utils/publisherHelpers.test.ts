@@ -68,6 +68,32 @@ describe("normalizePath", () => {
       expect(normalizePath("other/file.md", "blog")).toBe("other/file.md");
     });
   });
+
+  describe("Windows backslash handling", () => {
+    it("normalizes backslashes in path", () => {
+      expect(normalizePath("blog\\posts\\file.md", "blog")).toBe(
+        "posts/file.md",
+      );
+    });
+
+    it("normalizes backslashes in rootDir", () => {
+      expect(normalizePath("blog/posts/file.md", "blog\\")).toBe(
+        "posts/file.md",
+      );
+    });
+
+    it("normalizes backslashes in both path and rootDir", () => {
+      expect(normalizePath("Notes\\subfolder\\file.md", "Notes\\subfolder")).toBe(
+        "file.md",
+      );
+    });
+
+    it("handles mixed slashes", () => {
+      expect(normalizePath("Notes/subfolder\\file.md", "Notes\\subfolder")).toBe(
+        "file.md",
+      );
+    });
+  });
 });
 
 describe("isWithinRootDir", () => {
@@ -111,6 +137,22 @@ describe("isWithinRootDir", () => {
       expect(isWithinRootDir("content/other/file.md", "content/blog")).toBe(
         false,
       );
+    });
+  });
+
+  describe("Windows backslash handling", () => {
+    it("normalizes backslashes in rootDir", () => {
+      expect(isWithinRootDir("Notes/subfolder/file.md", "Notes\\subfolder")).toBe(true);
+      expect(isWithinRootDir("other/file.md", "Notes\\subfolder")).toBe(false);
+    });
+
+    it("normalizes backslashes in path", () => {
+      expect(isWithinRootDir("Notes\\subfolder\\file.md", "Notes/subfolder")).toBe(true);
+    });
+
+    it("normalizes backslashes in both path and rootDir", () => {
+      expect(isWithinRootDir("Notes\\subfolder\\file.md", "Notes\\subfolder")).toBe(true);
+      expect(isWithinRootDir("Other\\file.md", "Notes\\subfolder")).toBe(false);
     });
   });
 });

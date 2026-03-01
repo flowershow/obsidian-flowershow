@@ -1,3 +1,5 @@
+import { type RequestUrlResponse, requestUrl } from "obsidian";
+
 /**
  * FlowershowClient - API client for direct publishing to Flowershow
  * Supports publishing from Obsidian plugin using Flowershow PAT tokens
@@ -89,17 +91,20 @@ export class FlowershowClient {
   private async apiRequest(
     endpoint: string,
     options: RequestInit = {},
-  ): Promise<Response> {
+  ): Promise<RequestUrlResponse> {
     const url = `${this.apiUrl}${endpoint}`;
-    const headers = {
-      ...options.headers,
+    const headers: Record<string, string> = {
+      ...(options.headers as Record<string, string>),
       Authorization: `Bearer ${this.token}`,
-      "X-Flowershow-Plugin-Version": process.env.FLOWERSHOW_PLUGIN_VERSION!,
+      "X-Flowershow-Plugin-Version": process.env.FLOWERSHOW_PLUGIN_VERSION ?? "",
     };
 
-    return fetch(url, {
-      ...options,
+    return requestUrl({
+      url,
+      method: options.method as string,
       headers,
+      body: options.body as string | ArrayBuffer | undefined,
+      throw: false,
     });
   }
 
@@ -109,14 +114,15 @@ export class FlowershowClient {
   async getUserInfo(): Promise<UserInfo> {
     const response = await this.apiRequest("/api/user");
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
+    if (response.status >= 300) {
+      let error: { message?: string } = {};
+      try { error = response.json; } catch (_) {}
       throw new Error(
-        error.message || `Failed to get user info: ${response.statusText}`,
+        error.message || `Failed to get user info: ${response.status}`,
       );
     }
 
-    return await response.json();
+    return response.json;
   }
 
   /**
@@ -134,14 +140,15 @@ export class FlowershowClient {
       body: JSON.stringify({ projectName, overwrite }),
     });
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
+    if (response.status >= 300) {
+      let error: { message?: string } = {};
+      try { error = response.json; } catch (_) {}
       throw new Error(
-        error.message || `Failed to create site: ${response.statusText}`,
+        error.message || `Failed to create site: ${response.status}`,
       );
     }
 
-    return await response.json();
+    return response.json;
   }
 
   /**
@@ -155,18 +162,19 @@ export class FlowershowClient {
       `/api/sites/${username}/${siteName}`,
     );
 
-    if (!response.ok) {
-      if (response.status === 404) {
-        return null;
-      }
+    if (response.status === 404) {
+      return null;
+    }
 
-      const error = await response.json().catch(() => ({}));
+    if (response.status >= 300) {
+      let error: { message?: string } = {};
+      try { error = response.json; } catch (_) {}
       throw new Error(
-        error.message || `Failed to fetch site: ${response.statusText}`,
+        error.message || `Failed to fetch site: ${response.status}`,
       );
     }
 
-    return await response.json();
+    return response.json;
   }
 
   /**
@@ -188,14 +196,15 @@ export class FlowershowClient {
       body: JSON.stringify({ files }),
     });
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
+    if (response.status >= 300) {
+      let error: { message?: string } = {};
+      try { error = response.json; } catch (_) {}
       throw new Error(
-        error.message || `Failed to sync files: ${response.statusText}`,
+        error.message || `Failed to sync files: ${response.status}`,
       );
     }
 
-    return await response.json();
+    return response.json;
   }
 
   /**
@@ -216,16 +225,18 @@ export class FlowershowClient {
         : content
     ) as ArrayBuffer;
 
-    const response = await fetch(uploadUrl, {
+    const response = await requestUrl({
+      url: uploadUrl,
       method: "PUT",
       body: buffer,
       headers: {
         "Content-Type": contentType,
       },
+      throw: false,
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to upload file: ${response.statusText}`);
+    if (response.status >= 300) {
+      throw new Error(`Failed to upload file: ${response.status}`);
     }
 
     return true;
@@ -237,14 +248,15 @@ export class FlowershowClient {
   async getSiteStatus(siteId: string): Promise<SiteStatusResponse> {
     const response = await this.apiRequest(`/api/sites/id/${siteId}/status`);
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
+    if (response.status >= 300) {
+      let error: { message?: string } = {};
+      try { error = response.json; } catch (_) {}
       throw new Error(
-        error.message || `Failed to get site status: ${response.statusText}`,
+        error.message || `Failed to get site status: ${response.status}`,
       );
     }
 
-    return await response.json();
+    return response.json;
   }
 
   /**
@@ -253,14 +265,15 @@ export class FlowershowClient {
   async getSites(): Promise<{ sites: Site[]; total: number }> {
     const response = await this.apiRequest("/api/sites");
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
+    if (response.status >= 300) {
+      let error: { message?: string } = {};
+      try { error = response.json; } catch (_) {}
       throw new Error(
-        error.message || `Failed to fetch sites: ${response.statusText}`,
+        error.message || `Failed to fetch sites: ${response.status}`,
       );
     }
 
-    return await response.json();
+    return response.json;
   }
 
   /**
@@ -282,14 +295,15 @@ export class FlowershowClient {
       body: JSON.stringify({ files }),
     });
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
+    if (response.status >= 300) {
+      let error: { message?: string } = {};
+      try { error = response.json; } catch (_) {}
       throw new Error(
-        error.message || `Failed to publish files: ${response.statusText}`,
+        error.message || `Failed to publish files: ${response.status}`,
       );
     }
 
-    return await response.json();
+    return response.json;
   }
 
   /**
@@ -310,13 +324,14 @@ export class FlowershowClient {
       body: JSON.stringify({ paths }),
     });
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
+    if (response.status >= 300) {
+      let error: { message?: string } = {};
+      try { error = response.json; } catch (_) {}
       throw new Error(
-        error.message || `Failed to delete files: ${response.statusText}`,
+        error.message || `Failed to delete files: ${response.status}`,
       );
     }
 
-    return await response.json();
+    return response.json;
   }
 }

@@ -1,21 +1,20 @@
 import {
-  App,
-  Notice,
-  Plugin,
-  PluginSettingTab,
+  type App,
   addIcon,
-  PluginManifest,
+  Notice,
+  Platform,
+  Plugin,
+  type PluginManifest,
+  PluginSettingTab,
 } from "obsidian";
-
-import { IFlowershowSettings, DEFAULT_SETTINGS } from "src/settings";
-import Publisher from "src/Publisher";
-import PublishStatusBar from "src/PublishStatusBar";
 import { PublishStatusModal } from "src/components/PublishStatusModal";
 import { UpdateModal } from "src/components/UpdateModal";
-import SettingView from "src/SettingView";
-
 import { flowershowIcon } from "src/constants";
-import { FlowershowError, createSiteNotice } from "src/utils";
+import Publisher from "src/Publisher";
+import PublishStatusBar from "src/PublishStatusBar";
+import SettingView from "src/SettingView";
+import { DEFAULT_SETTINGS, type IFlowershowSettings } from "src/settings";
+import { createSiteNotice, FlowershowError } from "src/utils";
 
 export default class Flowershow extends Plugin {
   private startupAnalytics: string[] = [];
@@ -43,14 +42,16 @@ export default class Flowershow extends Plugin {
     // Show update modal for users who haven't seen v4.0 changes
     this.showUpdateModalIfNeeded();
 
-    this.statusBarItem = this.addStatusBarItem();
-    this.statusBarItem.addClass("mod-clickable");
-    this.statusBarItem.createEl("span", { text: "💐" });
-    this.statusBarItem.addEventListener("click", () => {
-      this.openPublishStatusModal();
-    });
-    const statusContainer = this.statusBarItem.createSpan();
-    this.statusBar = new PublishStatusBar(statusContainer);
+    if (Platform.isDesktop) {
+      this.statusBarItem = this.addStatusBarItem();
+      this.statusBarItem.addClass("mod-clickable");
+      this.statusBarItem.createEl("span", { text: "💐" });
+      this.statusBarItem.addEventListener("click", () => {
+        this.openPublishStatusModal();
+      });
+      const statusContainer = this.statusBarItem.createSpan();
+      this.statusBar = new PublishStatusBar(statusContainer);
+    }
 
     this.publisher = new Publisher(this.app, this.settings, this.statusBar);
 

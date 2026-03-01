@@ -10,10 +10,10 @@ import { IFlowershowSettings } from "src/settings";
  * Normalize a file path by removing leading slashes and stripping rootDir prefix
  */
 export function normalizePath(path: string, rootDir: string): string {
-  let normalizedPath = path.replace(/^\/+/, "");
+  let normalizedPath = path.replace(/\\/g, "/").replace(/^\/+/, "");
 
   if (rootDir) {
-    const rootDirNormalized = rootDir.replace(/^\/+|\/+$/g, "");
+    const rootDirNormalized = rootDir.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
     if (normalizedPath.startsWith(rootDirNormalized + "/")) {
       normalizedPath = normalizedPath.slice(rootDirNormalized.length + 1);
     } else if (normalizedPath === rootDirNormalized) {
@@ -32,8 +32,8 @@ export function isWithinRootDir(path: string, rootDir: string): boolean {
     return true;
   }
 
-  const rootDirNormalized = rootDir.replace(/^\/+|\/+$/g, "");
-  const pathNormalized = path.replace(/^\/+/, "");
+  const rootDirNormalized = rootDir.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+  const pathNormalized = path.replace(/\\/g, "/").replace(/^\/+/, "");
 
   return (
     pathNormalized.startsWith(rootDirNormalized + "/") ||
