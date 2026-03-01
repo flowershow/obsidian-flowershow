@@ -1,4 +1,4 @@
-import { App, TFile } from "obsidian";
+import { App, Notice, TFile } from "obsidian";
 import { IFlowershowSettings, API_URL } from "./settings";
 import {
   FlowershowError,
@@ -6,7 +6,6 @@ import {
   calculateTextSha,
   isPlainTextExtension,
 } from "./utils";
-import PublishStatusBar from "./PublishStatusBar";
 import { FlowershowClient, FileMetadata } from "./FlowershowClient";
 import {
   normalizePath,
@@ -26,19 +25,13 @@ export type PathToHashDict = { [key: string]: string };
 export default class Publisher {
   private app: App;
   private settings: IFlowershowSettings;
-  private publishStatusBar: PublishStatusBar | undefined;
   private client: FlowershowClient;
   private siteId: string | null = null;
   private username: string | null = null;
 
-  constructor(
-    app: App,
-    settings: IFlowershowSettings,
-    publishStatusBar: PublishStatusBar | undefined,
-  ) {
+  constructor(app: App, settings: IFlowershowSettings) {
     this.app = app;
     this.settings = settings;
-    this.publishStatusBar = publishStatusBar;
     this.client = new FlowershowClient(API_URL, this.settings.flowershowToken);
   }
 
@@ -154,10 +147,13 @@ export default class Publisher {
       throw new FlowershowError("No files to delete or publish provided");
     }
 
-    this.publishStatusBar?.start({
-      publishTotal: opts.filesToPublish?.length,
-      deleteTotal: opts.filesToDelete?.length,
-    });
+    const totalPublish = opts.filesToPublish?.length ?? 0;
+    const totalDelete = opts.filesToDelete?.length ?? 0;
+    const total = totalPublish + totalDelete;
+    let done = 0;
+
+    const label = totalPublish > 0 ? "Publishing" : "Unpublishing";
+    const progress = new Notice(`⌛ ${label} (0/${total})...`, 0);
 
     try {
       // Ensure site exists
@@ -186,7 +182,8 @@ export default class Publisher {
           );
         }
 
-        this.publishStatusBar?.incrementDelete();
+        done += totalDelete;
+        progress.setMessage(`⌛ ${label} (${done}/${total})...`);
       }
 
       // Handle file publishing
@@ -247,11 +244,12 @@ export default class Publisher {
             uploadInfo.contentType,
           );
 
-          this.publishStatusBar?.incrementPublish();
+          done++;
+          progress.setMessage(`⌛ ${label} (${done}/${total})...`);
         }
       }
 
-      this.publishStatusBar?.finish(2000);
+      progress.hide();
 
       // Get site info to return URL
       const username = await this.getUsername();
@@ -268,7 +266,7 @@ export default class Publisher {
           (opts.filesToDelete?.length || 0),
       };
     } catch (error) {
-      this.publishStatusBar?.finish(0);
+      progress.hide();
       throw error;
     }
   }

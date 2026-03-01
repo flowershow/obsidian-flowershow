@@ -88,53 +88,64 @@ This ensures your drawings will be properly published and displayed on your Flow
 
 ## Development
 
-### Local testing
+### Setup
 
-1. Clone the repository.
-2. Run `npm i` to install dependencies.
-3. Run `npm run build`.
-4. Create the plugins directory in your Obsidian vault if it doesn't exist:
+1. Clone the repository and install dependencies:
 
 ```sh
-mkdir -p /path/to/obsidian-vault/.obsidian/plugins/flowershow
+git clone https://github.com/flowershow/obsidian-flowershow
+cd obsidian-flowershow
+npm install
 ```
 
-5. Create symlinks to the `main.js`, `manifest.json`, and `styles.css` files in your Obsidian plugins folder:
+2. Symlink the plugin folder into your test vault's plugins directory:
 
 ```sh
-ln -s /path/to/obsidian-flowershow/main.js /path/to/obsidian-vault/.obsidian/plugins/flowershow/main.js
-ln -s /path/to/obsidian-flowershow/manifest.json /path/to/obsidian-vault/.obsidian/plugins/flowershow/manifest.json
-ln -s /path/to/obsidian-flowershow/styles.css /path/to/obsidian-vault/.obsidian/plugins/flowershow/styles.css
+mkdir -p /path/to/your-vault/.obsidian/plugins
+ln -s /path/to/obsidian-flowershow /path/to/your-vault/.obsidian/plugins/flowershow
 ```
 
-6. Reload Obsidian, go to Settings > Community Plugins, and enable the plugin.
-
-### Rebuild on change
-
-If you want to automatically rebuild the plugin after you make any changes to the source code, run `npm run dev` instead of `npm run build`. This will start a server that will watch for changes to the source files and rebuild the plugin automatically. However, you will still need to reload Obsidian manually each time to see the changes.
-
-### Hot reloading
-
-If you want true hot reloading, i.e. without needing to disable/enable the plugin:
-
-1. Install [Hot-Reload](https://github.com/pjeby/hot-reload) plugin:
-
-- download the .zip file from the latest release
-- extract the .zip file into your Obsidian vault's `.obsidian/plugins` folder
-- go to Settings > Community Plugins and enable the plugin
-
-2. Instead of creating symlinks like in step 4 above, copy/clone the plugin project directly into your Obsidian vault's `.obsidian/plugins` folder:
+3. Build the plugin:
 
 ```sh
-mv /path/to/obsidian-flowershow /path/to/obsidian-vault/.obsidian/plugins/
+npm run build
 ```
 
-3. Run `npm i && npm run dev` in the plugin folder to start the development server.
+4. In Obsidian, open your test vault, go to **Settings → Community plugins**, and enable **Flowershow**.
 
-Now, whenever you make any changes to the source code, two things will happen:
+### Dev mode (rebuild on save)
 
-1. The plugin will be rebuilt automatically.
-2. The Hot-Reload plugin will detect that the plugin has been rebuilt and will reload it in Obsidian.
+Run the dev server to automatically rebuild whenever you edit source files:
+
+```sh
+npm run dev
+```
+
+You'll still need to manually reload the plugin in Obsidian after each rebuild (**Settings → Community plugins → disable then re-enable Flowershow**), unless you set up hot reloading below.
+
+### Hot reloading (auto-reload in Obsidian)
+
+The [Hot Reload](https://github.com/pjeby/hot-reload) plugin detects when `main.js` changes and automatically reloads your plugin — no manual Obsidian restart needed.
+
+1. Install the Hot Reload plugin into your test vault:
+
+```sh
+mkdir -p /path/to/your-vault/.obsidian/plugins/hot-reload
+curl -L https://github.com/pjeby/hot-reload/releases/latest/download/main.js \
+  -o /path/to/your-vault/.obsidian/plugins/hot-reload/main.js
+curl -L https://github.com/pjeby/hot-reload/releases/latest/download/manifest.json \
+  -o /path/to/your-vault/.obsidian/plugins/hot-reload/manifest.json
+```
+
+2. In Obsidian, go to **Settings → Community plugins** and enable **Hot Reload**.
+
+3. Create a `.hotreload` marker file in this plugin's folder so Hot Reload watches it:
+
+```sh
+touch /path/to/obsidian-flowershow/.hotreload
+```
+
+Now run `npm run dev` and any change you save will be rebuilt and reloaded in Obsidian automatically.
 
 ## Shoutout
 
