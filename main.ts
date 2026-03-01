@@ -11,7 +11,6 @@ import { PublishStatusModal } from "src/components/PublishStatusModal";
 import { UpdateModal } from "src/components/UpdateModal";
 import { flowershowIcon } from "src/constants";
 import Publisher from "src/Publisher";
-import PublishStatusBar from "src/PublishStatusBar";
 import SettingView from "src/SettingView";
 import { DEFAULT_SETTINGS, type IFlowershowSettings } from "src/settings";
 import { createSiteNotice, FlowershowError } from "src/utils";
@@ -22,7 +21,6 @@ export default class Flowershow extends Plugin {
   private loadTimestamp: number;
   private publishStatusModal: PublishStatusModal;
   private statusBarItem: HTMLElement;
-  public statusBar: PublishStatusBar;
 
   public settings: IFlowershowSettings;
   public publisher: Publisher;
@@ -49,11 +47,9 @@ export default class Flowershow extends Plugin {
       this.statusBarItem.addEventListener("click", () => {
         this.openPublishStatusModal();
       });
-      const statusContainer = this.statusBarItem.createSpan();
-      this.statusBar = new PublishStatusBar(statusContainer);
     }
 
-    this.publisher = new Publisher(this.app, this.settings, this.statusBar);
+    this.publisher = new Publisher(this.app, this.settings);
 
     this.addSettingTab(new FlowershowSettingTab(this.app, this));
     await this.addCommands();
@@ -81,7 +77,7 @@ export default class Flowershow extends Plugin {
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
     // Recreate publisher with updated settings
-    this.publisher = new Publisher(this.app, this.settings, this.statusBar);
+    this.publisher = new Publisher(this.app, this.settings);
     // Clear cached modal so it picks up new publisher
     this.publishStatusModal = null!;
   }

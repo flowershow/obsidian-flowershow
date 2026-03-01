@@ -350,16 +350,10 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
 
 	const handlePublishOperation = async (
 		operation: "publish" | "unpublish",
-		count: number,
 		action: () => Promise<{ siteUrl: string; filesPublished: number }>
 	) => {
 		setIsPublishing(true);
 		try {
-			new Notice(
-				`⌛ ${
-					operation === "publish" ? "Publishing" : "Unpublishing"
-				} ${count} files...`
-			);
 			const result = await action();
 			const frag = document.createDocumentFragment();
 			frag.append(
@@ -399,7 +393,7 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
 		const selectedIds = selectedBySection.New;
 		const files = mapIdsToTFiles(newFiles, selectedIds);
 
-		await handlePublishOperation("publish", files.length, () =>
+		await handlePublishOperation("publish", () =>
 			publisher.publishBatch({ filesToPublish: files })
 		);
 	};
@@ -407,21 +401,21 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
 	const publishSelectedChangedFiles = async () => {
 		const selectedIds = selectedBySection.Changed;
 		const files = mapIdsToTFiles(changedFiles, selectedIds);
-		await handlePublishOperation("publish", files.length, () =>
+		await handlePublishOperation("publish", () =>
 			publisher.publishBatch({ filesToPublish: files })
 		);
 	};
 
 	const unpublishSelectedDeletedFiles = async () => {
 		const paths = selectedBySection.Deleted;
-		await handlePublishOperation("unpublish", paths.length, () =>
+		await handlePublishOperation("unpublish", () =>
 			publisher.publishBatch({ filesToDelete: paths })
 		);
 	};
 
 	const unpublishSelectedUnchangedFiles = async () => {
 		const paths = selectedBySection.Unchanged;
-		await handlePublishOperation("unpublish", paths.length, () =>
+		await handlePublishOperation("unpublish", () =>
 			publisher.publishBatch({ filesToDelete: paths })
 		);
 	};
@@ -483,7 +477,6 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
 
 							await handlePublishOperation(
 								"publish",
-								filesToPublish.length + filesToDelete.length,
 								() =>
 									publisher.publishBatch({
 										filesToPublish,
