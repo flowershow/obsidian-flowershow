@@ -1,5 +1,11 @@
 # flowershow
 
+## 4.0.14
+
+### Patch Changes
+
+- Hide warning about v4 changes.
+
 ## 4.0.13
 
 ### Patch Changes
