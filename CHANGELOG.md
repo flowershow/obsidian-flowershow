@@ -1,5 +1,11 @@
 # flowershow
 
+## 4.0.15
+
+### Patch Changes
+
+- Remove info box about v4 from the plugin options page.
+
 ## 4.0.14
 
 ### Patch Changes
