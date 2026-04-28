@@ -7,6 +7,12 @@ import {
   shouldSkipFile,
   validatePublishFrontmatter,
   validateSettings,
+  rewriteWikilinks,
+  rewriteEmbeds,
+  rewriteMarkdownLinks,
+  rewriteBaseQueryPaths,
+  rewriteFrontmatterPaths,
+  rewriteRootDirPaths,
 } from "./publisherHelpers";
 import { IFlowershowSettings } from "src/settings";
 import { App, TFile } from "obsidian";
@@ -489,5 +495,290 @@ describe("validateSettings", () => {
       lastSeenVersion: "4.0.0",
     };
     expect(validateSettings(settings)).toBe(true);
+  });
+});
+
+describe("rewriteWikilinks", () => {
+  it("returns content unchanged when no rootDir", () => {
+    expect(rewriteWikilinks("[[Public/note]]", "")).toBe("[[Public/note]]");
+  });
+
+  it("strips rootDir prefix from simple wikilink", () => {
+    expect(rewriteWikilinks("[[Public/note]]", "Public")).toBe("[[note]]");
+  });
+
+  it("strips rootDir prefix from nested path", () => {
+    expect(rewriteWikilinks("[[Public/Archive/note]]", "Public")).toBe("[[Archive/note]]");
+  });
+
+  it("preserves alias", () => {
+    expect(rewriteWikilinks("[[Public/Archive/note|My Note]]", "Public")).toBe("[[Archive/note|My Note]]");
+  });
+
+  it("preserves heading ref", () => {
+    expect(rewriteWikilinks("[[Public/Archive/note#heading]]", "Public")).toBe("[[Archive/note#heading]]");
+  });
+
+  it("preserves heading ref with alias", () => {
+    expect(rewriteWikilinks("[[Public/Archive/note#heading|alias]]", "Public")).toBe("[[Archive/note#heading|alias]]");
+  });
+
+  it("does not rewrite links outside rootDir", () => {
+    expect(rewriteWikilinks("[[Other/note]]", "Public")).toBe("[[Other/note]]");
+  });
+
+  it("does not rewrite partial directory name matches", () => {
+    expect(rewriteWikilinks("[[PublicArchive/note]]", "Public")).toBe("[[PublicArchive/note]]");
+  });
+
+  it("does not touch embeds", () => {
+    expect(rewriteWikilinks("![[Public/image.png]]", "Public")).toBe("![[Public/image.png]]");
+  });
+
+  it("rewrites multiple wikilinks in one document", () => {
+    const content = "See [[Public/a]] and [[Public/b]].";
+    expect(rewriteWikilinks(content, "Public")).toBe("See [[a]] and [[b]].");
+  });
+
+  it("handles rootDir with leading/trailing slashes", () => {
+    expect(rewriteWikilinks("[[Public/note]]", "/Public/")).toBe("[[note]]");
+  });
+});
+
+describe("rewriteEmbeds", () => {
+  it("returns content unchanged when no rootDir", () => {
+    expect(rewriteEmbeds("![[Public/image.png]]", "")).toBe("![[Public/image.png]]");
+  });
+
+  it("strips rootDir prefix from embed", () => {
+    expect(rewriteEmbeds("![[Public/image.png]]", "Public")).toBe("![[image.png]]");
+  });
+
+  it("strips rootDir prefix from nested embed path", () => {
+    expect(rewriteEmbeds("![[Public/Assets/photo.jpg]]", "Public")).toBe("![[Assets/photo.jpg]]");
+  });
+
+  it("preserves alias in embed", () => {
+    expect(rewriteEmbeds("![[Public/image.png|200]]", "Public")).toBe("![[image.png|200]]");
+  });
+
+  it("preserves heading ref in embed", () => {
+    expect(rewriteEmbeds("![[Public/note#section]]", "Public")).toBe("![[note#section]]");
+  });
+
+  it("does not rewrite embeds outside rootDir", () => {
+    expect(rewriteEmbeds("![[Other/image.png]]", "Public")).toBe("![[Other/image.png]]");
+  });
+
+  it("does not touch plain wikilinks", () => {
+    expect(rewriteEmbeds("[[Public/note]]", "Public")).toBe("[[Public/note]]");
+  });
+
+  it("rewrites multiple embeds", () => {
+    const content = "![[Public/a.png]] and ![[Public/b.png]]";
+    expect(rewriteEmbeds(content, "Public")).toBe("![[a.png]] and ![[b.png]]");
+  });
+});
+
+describe("rewriteMarkdownLinks", () => {
+  it("returns content unchanged when no rootDir", () => {
+    expect(rewriteMarkdownLinks("[text](Public/note.md)", "")).toBe("[text](Public/note.md)");
+  });
+
+  it("strips rootDir prefix from markdown link", () => {
+    expect(rewriteMarkdownLinks("[text](Public/note.md)", "Public")).toBe("[text](note.md)");
+  });
+
+  it("strips rootDir prefix from nested path", () => {
+    expect(rewriteMarkdownLinks("[text](Public/Archive/note.md)", "Public")).toBe("[text](Archive/note.md)");
+  });
+
+  it("preserves anchor fragment", () => {
+    expect(rewriteMarkdownLinks("[text](Public/note.md#section)", "Public")).toBe("[text](note.md#section)");
+  });
+
+  it("does not rewrite external http links", () => {
+    expect(rewriteMarkdownLinks("[text](https://example.com/Public/note)", "Public")).toBe(
+      "[text](https://example.com/Public/note)"
+    );
+  });
+
+  it("does not rewrite absolute paths starting with /", () => {
+    expect(rewriteMarkdownLinks("[text](/Public/note.md)", "Public")).toBe("[text](/Public/note.md)");
+  });
+
+  it("does not rewrite fragment-only links", () => {
+    expect(rewriteMarkdownLinks("[text](#section)", "Public")).toBe("[text](#section)");
+  });
+
+  it("does not rewrite links outside rootDir", () => {
+    expect(rewriteMarkdownLinks("[text](Other/note.md)", "Public")).toBe("[text](Other/note.md)");
+  });
+
+  it("rewrites multiple markdown links", () => {
+    const content = "[a](Public/a.md) and [b](Public/b.md)";
+    expect(rewriteMarkdownLinks(content, "Public")).toBe("[a](a.md) and [b](b.md)");
+  });
+
+  it("does not rewrite mailto links", () => {
+    expect(rewriteMarkdownLinks("[email](mailto:user@example.com)", "Public")).toBe(
+      "[email](mailto:user@example.com)"
+    );
+  });
+
+  it("does not rewrite ftp links", () => {
+    expect(rewriteMarkdownLinks("[file](ftp://example.com/Public/file)", "Public")).toBe(
+      "[file](ftp://example.com/Public/file)"
+    );
+  });
+});
+
+describe("rewriteBaseQueryPaths", () => {
+  it("returns content unchanged when no rootDir", () => {
+    const content = '```base\npath contains "Public/Archive"\n```';
+    expect(rewriteBaseQueryPaths(content, "")).toBe(content);
+  });
+
+  it("strips rootDir from double-quoted path in base block", () => {
+    const content = '```base\npath contains "Public/Archive"\n```';
+    const expected = '```base\npath contains "Archive"\n```';
+    expect(rewriteBaseQueryPaths(content, "Public")).toBe(expected);
+  });
+
+  it("strips rootDir from single-quoted path in base block", () => {
+    const content = "```base\npath contains 'Public/Archive'\n```";
+    const expected = "```base\npath contains 'Archive'\n```";
+    expect(rewriteBaseQueryPaths(content, "Public")).toBe(expected);
+  });
+
+  it("strips rootDir from exact path literal", () => {
+    const content = '```base\npath = "Public/Archive/note.md"\n```';
+    const expected = '```base\npath = "Archive/note.md"\n```';
+    expect(rewriteBaseQueryPaths(content, "Public")).toBe(expected);
+  });
+
+  it("does not rewrite paths outside base blocks", () => {
+    const content = 'Some text "Public/Archive/note.md" here.';
+    expect(rewriteBaseQueryPaths(content, "Public")).toBe(content);
+  });
+
+  it("does not rewrite paths that don't start with rootDir", () => {
+    const content = '```base\npath contains "Other/Archive"\n```';
+    expect(rewriteBaseQueryPaths(content, "Public")).toBe(content);
+  });
+
+  it("rewrites multiple quoted paths in one base block", () => {
+    const content = '```base\npath contains "Public/a" OR path contains "Public/b"\n```';
+    const expected = '```base\npath contains "a" OR path contains "b"\n```';
+    expect(rewriteBaseQueryPaths(content, "Public")).toBe(expected);
+  });
+
+  it("handles multiple base blocks in document", () => {
+    const content = '```base\npath = "Public/a"\n```\n\nText\n\n```base\npath = "Public/b"\n```';
+    const expected = '```base\npath = "a"\n```\n\nText\n\n```base\npath = "b"\n```';
+    expect(rewriteBaseQueryPaths(content, "Public")).toBe(expected);
+  });
+
+  it("does not touch non-base fenced blocks", () => {
+    const content = '```sql\npath contains "Public/Archive"\n```';
+    expect(rewriteBaseQueryPaths(content, "Public")).toBe(content);
+  });
+
+  it("rewrites inFolder call with exact rootDir value to empty string", () => {
+    const content = '```base\nfile.inFolder("Public")\n```';
+    const expected = '```base\nfile.inFolder("")\n```';
+    expect(rewriteBaseQueryPaths(content, "Public")).toBe(expected);
+  });
+});
+
+describe("rewriteFrontmatterPaths", () => {
+  it("returns content unchanged when no rootDir", () => {
+    const content = "---\ncover: Public/Assets/hero.jpg\n---\n# Title";
+    expect(rewriteFrontmatterPaths(content, "")).toBe(content);
+  });
+
+  it("strips rootDir from bare YAML value", () => {
+    const content = "---\ncover: Public/Assets/hero.jpg\n---\n# Title";
+    const expected = "---\ncover: Assets/hero.jpg\n---\n# Title";
+    expect(rewriteFrontmatterPaths(content, "Public")).toBe(expected);
+  });
+
+  it("strips rootDir from double-quoted YAML value", () => {
+    const content = '---\ncover: "Public/Assets/hero.jpg"\n---';
+    const expected = '---\ncover: "Assets/hero.jpg"\n---';
+    expect(rewriteFrontmatterPaths(content, "Public")).toBe(expected);
+  });
+
+  it("strips rootDir from single-quoted YAML value", () => {
+    const content = "---\ncover: 'Public/Assets/hero.jpg'\n---";
+    const expected = "---\ncover: 'Assets/hero.jpg'\n---";
+    expect(rewriteFrontmatterPaths(content, "Public")).toBe(expected);
+  });
+
+  it("does not rewrite non-path YAML values", () => {
+    const content = "---\ntitle: My Note\ntags: [public, archive]\n---";
+    expect(rewriteFrontmatterPaths(content, "Public")).toBe(content);
+  });
+
+  it("does not rewrite paths in document body", () => {
+    const content = "---\ntitle: Title\n---\ncover: Public/Assets/hero.jpg";
+    expect(rewriteFrontmatterPaths(content, "Public")).toBe(content);
+  });
+
+  it("does not rewrite if no frontmatter present", () => {
+    const content = "# Title\ncover: Public/Assets/hero.jpg";
+    expect(rewriteFrontmatterPaths(content, "Public")).toBe(content);
+  });
+
+  it("rewrites multiple path values in frontmatter", () => {
+    const content = "---\ncover: Public/Assets/hero.jpg\nthumbnail: Public/Assets/thumb.png\n---";
+    const expected = "---\ncover: Assets/hero.jpg\nthumbnail: Assets/thumb.png\n---";
+    expect(rewriteFrontmatterPaths(content, "Public")).toBe(expected);
+  });
+
+  it("handles rootDir with slashes", () => {
+    const content = "---\ncover: Public/Assets/hero.jpg\n---";
+    expect(rewriteFrontmatterPaths(content, "/Public/")).toBe("---\ncover: Assets/hero.jpg\n---");
+  });
+
+  it("handles $ characters in rewritten value without corruption", () => {
+    const content = "---\ncover: Public/cost$&report.jpg\n---\n# Body";
+    const expected = "---\ncover: cost$&report.jpg\n---\n# Body";
+    expect(rewriteFrontmatterPaths(content, "Public")).toBe(expected);
+  });
+});
+
+describe("rewriteRootDirPaths", () => {
+  it("returns content unchanged when no rootDir", () => {
+    const content = "[[Public/note]] ![[Public/img.png]] [t](Public/n.md)";
+    expect(rewriteRootDirPaths(content, "")).toBe(content);
+  });
+
+  it("applies all rewriters in one call", () => {
+    const content = [
+      "---",
+      "cover: Public/Assets/hero.jpg",
+      "---",
+      "[[Public/Archive/note]]",
+      "![[Public/Assets/img.png]]",
+      "[link](Public/Archive/doc.md)",
+      "```base",
+      'path contains "Public/Archive"',
+      "```",
+    ].join("\n");
+
+    const expected = [
+      "---",
+      "cover: Assets/hero.jpg",
+      "---",
+      "[[Archive/note]]",
+      "![[Assets/img.png]]",
+      "[link](Archive/doc.md)",
+      "```base",
+      'path contains "Archive"',
+      "```",
+    ].join("\n");
+
+    expect(rewriteRootDirPaths(content, "Public")).toBe(expected);
   });
 });

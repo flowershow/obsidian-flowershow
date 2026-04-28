@@ -1,5 +1,11 @@
 # flowershow
 
+## 4.0.16
+
+### Patch Changes
+
+- 49f41f6: Fix broken internal links when publishing a vault subdirectory — wikilinks, embeds, markdown links, Base query filters, and frontmatter path values are now rewritten to be relative to rootDir
+
 ## 4.0.15
 
 ### Patch Changes
@@ -25,7 +31,6 @@
 ### Patch Changes
 
 - 0eaa93f: fix: mobile and Windows compatibility improvements
-
   - Replace `fetch()` with Obsidian's `requestUrl()` in `FlowershowClient` so HTTP requests work on iOS and Android (Capacitor WebView blocks cross-origin `fetch`)
   - Normalize backslashes to forward slashes in `rootDir` and file paths so Windows users with `Notes\subfolder` style settings can publish correctly
   - Guard `addStatusBarItem()` with `Platform.isDesktop` to avoid dead UI code on mobile

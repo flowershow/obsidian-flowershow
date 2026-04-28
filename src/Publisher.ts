@@ -11,6 +11,7 @@ import {
   normalizePath,
   shouldSkipFile,
   validatePublishFrontmatter,
+  rewriteRootDirPaths,
 } from "./utils/publisherHelpers";
 
 export interface PublishStatus {
@@ -84,6 +85,11 @@ export default class Publisher {
     const { site } = await this.client.createSite(this.getSiteName());
     this.siteId = site.id;
     return this.siteId;
+  }
+
+  private async getTextContent(file: TFile): Promise<string> {
+    const text = await this.app.vault.cachedRead(file);
+    return rewriteRootDirPaths(text, this.settings.rootDir);
   }
 
   /**
@@ -201,7 +207,7 @@ export default class Publisher {
           // Calculate SHA
           let sha: string;
           if (isPlainTextExtension(file.extension)) {
-            const text = await this.app.vault.cachedRead(file);
+            const text = await this.getTextContent(file);
             sha = await calculateTextSha(text);
           } else {
             const bytes = await this.app.vault.readBinary(file);
@@ -231,7 +237,7 @@ export default class Publisher {
 
           let content: ArrayBuffer | Uint8Array;
           if (isPlainTextExtension(file.extension)) {
-            const text = await this.app.vault.cachedRead(file);
+            const text = await this.getTextContent(file);
             content = new TextEncoder().encode(text);
           } else {
             const bytes = await this.app.vault.readBinary(file);
@@ -328,7 +334,7 @@ export default class Publisher {
 
         let sha: string;
         if (isPlainTextExtension(file.extension)) {
-          const text = await this.app.vault.cachedRead(file);
+          const text = await this.getTextContent(file);
           sha = await calculateTextSha(text);
         } else {
           const bytes = await this.app.vault.readBinary(file);
