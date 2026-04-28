@@ -1,5 +1,11 @@
 # flowershow
 
+## 4.0.17
+
+### Patch Changes
+
+- Scope checkbox CSS to avoid conflicting with other plugins.
+
 ## 4.0.16
 
 ### Patch Changes
