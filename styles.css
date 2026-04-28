@@ -7,7 +7,7 @@ If your plugin does not need CSS, delete this file.
 */
 
 /* Reapplies Mui styles that get overriden by Obsidian styles */
-.modal-content input[type="checkbox"] {
+.publish-status-view input[type="checkbox"] {
   cursor: inherit;
   position: absolute;
   opacity: 0;
@@ -20,7 +20,7 @@ If your plugin does not need CSS, delete this file.
   z-index: 1;
 }
 
-.MuiCheckbox-root .MuiSvgIcon-root {
+.publish-status-view .MuiCheckbox-root .MuiSvgIcon-root {
   color: var(--text-faint);
 }
 
