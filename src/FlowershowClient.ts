@@ -41,6 +41,7 @@ export interface SyncFilesResponse {
     unchanged: number;
   };
   dryRun?: boolean;
+  publishId?: string;
 }
 
 export interface BlobStatus {
@@ -63,6 +64,7 @@ export interface SiteStatusResponse {
 
 export interface PublishFilesResponse {
   files: UploadUrl[];
+  publishId?: string;
 }
 
 export interface DeleteFilesResponse {
@@ -214,6 +216,7 @@ export class FlowershowClient {
     uploadUrl: string,
     content: ArrayBuffer | Uint8Array,
     contentType: string,
+    publishId?: string,
   ): Promise<boolean> {
     // Convert Uint8Array to ArrayBuffer if needed
     const buffer: ArrayBuffer = (
@@ -225,13 +228,16 @@ export class FlowershowClient {
         : content
     ) as ArrayBuffer;
 
+    const headers: Record<string, string> = { "Content-Type": contentType };
+    if (publishId) {
+      headers["x-amz-meta-publish-id"] = publishId;
+    }
+
     const response = await requestUrl({
       url: uploadUrl,
       method: "PUT",
       body: buffer,
-      headers: {
-        "Content-Type": contentType,
-      },
+      headers,
       throw: false,
     });
 

@@ -248,6 +248,7 @@ export default class Publisher {
             uploadInfo.uploadUrl,
             content,
             uploadInfo.contentType,
+            publishResult.publishId,
           );
 
           done++;
