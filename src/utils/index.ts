@@ -51,7 +51,9 @@ export class FlowershowError extends Error {
 }
 
 export function isPlainTextExtension(ext: string) {
-  return ["md", "mdx", "json", "yaml", "yml", "css"].includes(ext);
+  return ["md", "mdx", "json", "yaml", "yml", "css"].includes(
+    ext.toLowerCase(),
+  );
 }
 
 export function createSiteNotice(
