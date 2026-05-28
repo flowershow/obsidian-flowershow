@@ -53,7 +53,6 @@ export class FlowershowError extends Error {
 export function isPlainTextExtension(ext: string) {
   return ["md", "mdx", "json", "yaml", "yml", "css"].includes(ext);
 }
-export type GitAlgo = "SHA-1" | "SHA-256";
 
 export function createSiteNotice(
   message: string,
