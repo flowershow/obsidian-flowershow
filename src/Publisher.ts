@@ -197,6 +197,9 @@ export default class Publisher {
         // Prepare file metadata for selected files only
         const fileMetadata: FileMetadata[] = [];
         const filesToProcess = opts.filesToPublish;
+        // Cache rewritten text per file path so the SHA we submit and the
+        // bytes we upload come from the same rewriter pass.
+        const textCache = new Map<string, string>();
 
         for (const file of filesToProcess) {
           const normalizedPath = normalizePath(
@@ -208,6 +211,7 @@ export default class Publisher {
           let sha: string;
           if (isPlainTextExtension(file.extension)) {
             const text = await this.getTextContent(file);
+            textCache.set(file.path, text);
             sha = await calculateTextSha(text);
           } else {
             const bytes = await this.app.vault.readBinary(file);
@@ -237,7 +241,8 @@ export default class Publisher {
 
           let content: ArrayBuffer | Uint8Array;
           if (isPlainTextExtension(file.extension)) {
-            const text = await this.getTextContent(file);
+            const text =
+              textCache.get(file.path) ?? (await this.getTextContent(file));
             content = new TextEncoder().encode(text);
           } else {
             const bytes = await this.app.vault.readBinary(file);
