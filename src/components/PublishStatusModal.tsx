@@ -28,6 +28,7 @@ import {
 } from "@mui/x-tree-view/TreeItem";
 import { Box } from "@mui/material";
 import { FlowershowError } from "src/utils";
+import { validateSettings } from "src/utils/publisherHelpers";
 
 interface PublishStatusModalProps {
 	app: App;
@@ -282,6 +283,7 @@ interface PublishStatusModalContentProps extends PublishStatusModalProps {
 
 const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
 	publisher,
+	settings,
 	onClose,
 	initialStatus,
 	initialSiteId,
@@ -352,6 +354,7 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
 		operation: "publish" | "unpublish",
 		action: () => Promise<{ siteUrl: string; filesPublished: number }>
 	) => {
+		if (!validateSettings(settings)) return;
 		setIsPublishing(true);
 		try {
 			const result = await action();
