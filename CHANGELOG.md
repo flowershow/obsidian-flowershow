@@ -1,5 +1,11 @@
 # flowershow
 
+## 4.1.0
+
+### Minor Changes
+
+- Publish history tracking: the plugin now sends a `publish-id` header with every R2 upload, enabling per-file status tracking and a full publish history in the Flowershow dashboard.
+
 ## 4.0.17
 
 ### Patch Changes
