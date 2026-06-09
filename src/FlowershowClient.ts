@@ -88,8 +88,8 @@ export class FlowershowClient {
   }
 
   /**
-   * Make an authenticated API request. Throws on non-2xx responses unless the
-   * status is listed in `allowedStatuses`.
+   * Make an authenticated API request. Throws on non-success responses
+   * (status >= 300) unless the status is listed in `allowedStatuses`.
    *
    * The thrown Error's message uses the server's `message` field when present,
    * falling back to `${errorContext}: ${status}`.
@@ -119,10 +119,22 @@ export class FlowershowClient {
       response.status >= 300 &&
       !allowedStatuses.includes(response.status)
     ) {
-      let error: { message?: string } = {};
-      try { error = response.json; } catch (_) {}
+      // `response.json` is a getter that parses the body; it throws when the
+      // error body isn't valid JSON, so guard both the parse and the shape.
+      let serverMessage: string | undefined;
+      try {
+        const body: unknown = response.json;
+        if (
+          body &&
+          typeof body === "object" &&
+          "message" in body &&
+          typeof (body as { message: unknown }).message === "string"
+        ) {
+          serverMessage = (body as { message: string }).message;
+        }
+      } catch (_) {}
       throw new Error(
-        error.message || `${errorContext}: ${response.status}`,
+        serverMessage || `${errorContext}: ${response.status}`,
       );
     }
 
