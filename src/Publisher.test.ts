@@ -25,6 +25,10 @@ const baseSettings = (overrides: Partial<IFlowershowSettings> = {}): IFlowershow
   ...overrides,
 });
 
+// Obsidian's TFile.stat.size is a byte count; string.length is UTF-16 code
+// units. Encode so fixtures stay accurate for non-ASCII content.
+const byteSize = (s: string): number => new TextEncoder().encode(s).length;
+
 interface FakeFile {
   path: string;
   extension: string;
@@ -43,7 +47,7 @@ function makeApp(files: FakeFile[]): App {
           ({
             path: f.path,
             extension: f.extension,
-            stat: { size: f.content.length },
+            stat: { size: byteSize(f.content) },
           }) as TFile,
       ),
   };
@@ -105,7 +109,7 @@ function makeTFile(file: FakeFile): TFile {
   return {
     path: file.path,
     extension: file.extension,
-    stat: { size: file.content.length },
+    stat: { size: byteSize(file.content) },
   } as TFile;
 }
 
