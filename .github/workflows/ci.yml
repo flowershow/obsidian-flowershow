@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   check:
-    name: Build, lint, type-check, test
+    name: Type check and test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -22,12 +22,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22.x"
+          cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Type check
-        run: npx tsc -noEmit -skipLibCheck
+        run: npx tsc --noEmit --skipLibCheck
 
       - name: Tests
         run: npm test
