@@ -543,6 +543,17 @@ describe("rewriteWikilinks", () => {
   it("handles rootDir with leading/trailing slashes", () => {
     expect(rewriteWikilinks("[[Public/note]]", "/Public/")).toBe("[[note]]");
   });
+
+  it("preserves backslash-escaped pipe in table wikilinks", () => {
+    expect(rewriteWikilinks("[[nonmagical-items\\|Nonmagical Items]]", "rules")).toBe(
+      "[[nonmagical-items\\|Nonmagical Items]]"
+    );
+  });
+
+  it("preserves backslash-escaped pipe in multiple table wikilinks", () => {
+    const content = "| [[items\\|Items]] | [[potions\\|Potions]] |";
+    expect(rewriteWikilinks(content, "rules")).toBe(content);
+  });
 });
 
 describe("rewriteEmbeds", () => {

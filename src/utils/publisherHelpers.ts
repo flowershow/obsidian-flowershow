@@ -154,7 +154,7 @@ function stripRootDirPrefix(path: string, rootDirNormalized: string): string {
   if (p === rootDirNormalized) {
     return "";
   }
-  return p;
+  return path;
 }
 
 export function rewriteWikilinks(content: string, rootDir: string): string {

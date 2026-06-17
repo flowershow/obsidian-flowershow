@@ -1,5 +1,11 @@
 # flowershow
 
+## 4.1.1
+
+### Patch Changes
+
+- Preserve backslash-escaped pipes in wikilinks inside tables.
+
 ## 4.1.0
 
 ### Minor Changes
