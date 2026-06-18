@@ -88,11 +88,17 @@ export class FlowershowClient {
   }
 
   /**
-   * Make an authenticated API request
+   * Make an authenticated API request. Throws on non-success responses
+   * (status >= 300) unless the status is listed in `allowedStatuses`.
+   *
+   * The thrown Error's message uses the server's `message` field when present,
+   * falling back to `${errorContext}: ${status}`.
    */
   private async apiRequest(
     endpoint: string,
+    errorContext: string,
     options: RequestInit = {},
+    allowedStatuses: number[] = [],
   ): Promise<RequestUrlResponse> {
     const url = `${this.apiUrl}${endpoint}`;
     const headers: Record<string, string> = {
@@ -101,29 +107,45 @@ export class FlowershowClient {
       "X-Flowershow-Plugin-Version": process.env.FLOWERSHOW_PLUGIN_VERSION ?? "",
     };
 
-    return requestUrl({
+    const response = await requestUrl({
       url,
       method: options.method as string,
       headers,
       body: options.body as string | ArrayBuffer | undefined,
       throw: false,
     });
+
+    if (
+      response.status >= 300 &&
+      !allowedStatuses.includes(response.status)
+    ) {
+      // `response.json` is a getter that parses the body; it throws when the
+      // error body isn't valid JSON, so guard both the parse and the shape.
+      let serverMessage: string | undefined;
+      try {
+        const body: unknown = response.json;
+        if (
+          body &&
+          typeof body === "object" &&
+          "message" in body &&
+          typeof (body as { message: unknown }).message === "string"
+        ) {
+          serverMessage = (body as { message: string }).message;
+        }
+      } catch (_) {}
+      throw new Error(
+        serverMessage || `${errorContext}: ${response.status}`,
+      );
+    }
+
+    return response;
   }
 
   /**
    * Get user info (to validate token)
    */
   async getUserInfo(): Promise<UserInfo> {
-    const response = await this.apiRequest("/api/user");
-
-    if (response.status >= 300) {
-      let error: { message?: string } = {};
-      try { error = response.json; } catch (_) {}
-      throw new Error(
-        error.message || `Failed to get user info: ${response.status}`,
-      );
-    }
-
+    const response = await this.apiRequest("/api/user", "Failed to get user info");
     return response.json;
   }
 
@@ -134,27 +156,18 @@ export class FlowershowClient {
     projectName: string,
     overwrite: boolean = false,
   ): Promise<{ site: Site }> {
-    const response = await this.apiRequest("/api/sites", {
+    const response = await this.apiRequest("/api/sites", "Failed to create site", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ projectName, overwrite }),
     });
-
-    if (response.status >= 300) {
-      let error: { message?: string } = {};
-      try { error = response.json; } catch (_) {}
-      throw new Error(
-        error.message || `Failed to create site: ${response.status}`,
-      );
-    }
-
     return response.json;
   }
 
   /**
-   * Get a site by name
+   * Get a site by name. Returns null if the site doesn't exist (404).
    */
   async getSiteByName(
     username: string,
@@ -162,20 +175,11 @@ export class FlowershowClient {
   ): Promise<{ site: Site } | null> {
     const response = await this.apiRequest(
       `/api/sites/${username}/${siteName}`,
+      "Failed to fetch site",
+      {},
+      [404],
     );
-
-    if (response.status === 404) {
-      return null;
-    }
-
-    if (response.status >= 300) {
-      let error: { message?: string } = {};
-      try { error = response.json; } catch (_) {}
-      throw new Error(
-        error.message || `Failed to fetch site: ${response.status}`,
-      );
-    }
-
+    if (response.status === 404) return null;
     return response.json;
   }
 
@@ -190,22 +194,13 @@ export class FlowershowClient {
     dryRun: boolean = false,
   ): Promise<SyncFilesResponse> {
     const url = `/api/sites/id/${siteId}/sync${dryRun ? "?dryRun=true" : ""}`;
-    const response = await this.apiRequest(url, {
+    const response = await this.apiRequest(url, "Failed to sync files", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ files }),
     });
-
-    if (response.status >= 300) {
-      let error: { message?: string } = {};
-      try { error = response.json; } catch (_) {}
-      throw new Error(
-        error.message || `Failed to sync files: ${response.status}`,
-      );
-    }
-
     return response.json;
   }
 
@@ -252,16 +247,10 @@ export class FlowershowClient {
    * Get site processing status
    */
   async getSiteStatus(siteId: string): Promise<SiteStatusResponse> {
-    const response = await this.apiRequest(`/api/sites/id/${siteId}/status`);
-
-    if (response.status >= 300) {
-      let error: { message?: string } = {};
-      try { error = response.json; } catch (_) {}
-      throw new Error(
-        error.message || `Failed to get site status: ${response.status}`,
-      );
-    }
-
+    const response = await this.apiRequest(
+      `/api/sites/id/${siteId}/status`,
+      "Failed to get site status",
+    );
     return response.json;
   }
 
@@ -269,16 +258,7 @@ export class FlowershowClient {
    * Get all sites for the user
    */
   async getSites(): Promise<{ sites: Site[]; total: number }> {
-    const response = await this.apiRequest("/api/sites");
-
-    if (response.status >= 300) {
-      let error: { message?: string } = {};
-      try { error = response.json; } catch (_) {}
-      throw new Error(
-        error.message || `Failed to fetch sites: ${response.status}`,
-      );
-    }
-
+    const response = await this.apiRequest("/api/sites", "Failed to fetch sites");
     return response.json;
   }
 
@@ -293,22 +273,17 @@ export class FlowershowClient {
     siteId: string,
     files: FileMetadata[],
   ): Promise<PublishFilesResponse> {
-    const response = await this.apiRequest(`/api/sites/id/${siteId}/files`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+    const response = await this.apiRequest(
+      `/api/sites/id/${siteId}/files`,
+      "Failed to publish files",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ files }),
       },
-      body: JSON.stringify({ files }),
-    });
-
-    if (response.status >= 300) {
-      let error: { message?: string } = {};
-      try { error = response.json; } catch (_) {}
-      throw new Error(
-        error.message || `Failed to publish files: ${response.status}`,
-      );
-    }
-
+    );
     return response.json;
   }
 
@@ -322,22 +297,17 @@ export class FlowershowClient {
     siteId: string,
     paths: string[],
   ): Promise<DeleteFilesResponse> {
-    const response = await this.apiRequest(`/api/sites/id/${siteId}/files`, {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
+    const response = await this.apiRequest(
+      `/api/sites/id/${siteId}/files`,
+      "Failed to delete files",
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ paths }),
       },
-      body: JSON.stringify({ paths }),
-    });
-
-    if (response.status >= 300) {
-      let error: { message?: string } = {};
-      try { error = response.json; } catch (_) {}
-      throw new Error(
-        error.message || `Failed to delete files: ${response.status}`,
-      );
-    }
-
+    );
     return response.json;
   }
 }
