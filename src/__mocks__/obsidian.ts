@@ -5,6 +5,10 @@ export class Notice {
   constructor(message: string, duration?: number) {
     // Mock implementation - do nothing in tests
   }
+  setMessage(_message: string) {
+    return this;
+  }
+  hide() {}
 }
 
 export class Modal {
