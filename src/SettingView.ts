@@ -1,17 +1,12 @@
 import Publisher from "./Publisher";
 import { IFlowershowSettings } from "./settings";
-import { Notice, Setting, debounce, MetadataCache } from "obsidian";
+import { Setting } from "obsidian";
 
 export default class SettingView {
 	private publisher: Publisher;
 	private settings: IFlowershowSettings;
 	private saveSettings: () => Promise<void>;
 	private settingsRootElement: HTMLElement;
-	debouncedSaveAndUpdate = debounce(
-		this.saveSiteSettingsAndUpdateEnv,
-		500,
-		true,
-	);
 
 	constructor(
 		settingsRootElement: HTMLElement,
@@ -81,26 +76,6 @@ export default class SettingView {
 		});
 		this.initializeRootDirSetting();
 		this.initializeExcludePatternsSetting();
-	}
-
-	private async saveSiteSettingsAndUpdateEnv(
-		metadataCache: MetadataCache,
-		settings: IFlowershowSettings,
-		saveSettings: () => Promise<void>,
-	) {
-		let updateFailed = false;
-		try {
-			await saveSettings();
-		} catch {
-			new Notice(
-				"Failed to update settings. Make sure you have an internet connection.",
-			);
-			updateFailed = true;
-		}
-
-		if (!updateFailed) {
-			await saveSettings();
-		}
 	}
 
 	private initializeTokenSetting() {

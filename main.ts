@@ -4,11 +4,9 @@ import {
 	Notice,
 	Platform,
 	Plugin,
-	type PluginManifest,
 	PluginSettingTab,
 } from "obsidian";
 import { PublishStatusModal } from "src/components/PublishStatusModal";
-import { UpdateModal } from "src/components/UpdateModal";
 import { flowershowIcon } from "src/constants";
 import Publisher from "src/Publisher";
 import SettingView from "src/SettingView";
@@ -16,29 +14,14 @@ import { DEFAULT_SETTINGS, type IFlowershowSettings } from "src/settings";
 import { createSiteNotice, FlowershowError } from "src/utils";
 
 export default class Flowershow extends Plugin {
-	private startupAnalytics: string[] = [];
-	private lastLogTimestamp: number;
-	private loadTimestamp: number;
 	private publishStatusModal: PublishStatusModal;
 	private statusBarItem: HTMLElement;
 
 	public settings: IFlowershowSettings;
 	public publisher: Publisher;
 
-	constructor(app: App, manifest: PluginManifest) {
-		super(app, manifest);
-		this.loadTimestamp = Date.now();
-		this.lastLogTimestamp = this.loadTimestamp;
-		this.startupAnalytics = [];
-	}
-
 	async onload() {
-		this.logStartupEvent("Plugin Constructor ready, starting onload()");
-
 		await this.loadSettings();
-
-		// Show update modal for users who haven't seen v4.0 changes
-		// this.showUpdateModalIfNeeded();
 
 		if (Platform.isDesktop) {
 			this.statusBarItem = this.addStatusBarItem();
@@ -189,31 +172,6 @@ export default class Flowershow extends Plugin {
 		}
 		this.publishStatusModal.open();
 	}
-
-	public logStartupEvent(message: string) {
-		const timestamp = Date.now();
-		this.startupAnalytics.push(
-			`${message}\nTotal: ${timestamp - this.loadTimestamp}ms Delta: ${
-				timestamp - this.lastLogTimestamp
-			}ms\n`
-		);
-		this.lastLogTimestamp = timestamp;
-	}
-
-	// private showUpdateModalIfNeeded() {
-	//   // Show modal if user hasn't seen any version yet (new user or upgrading from pre-4.0)
-	//   if (
-	//     !this.settings.lastSeenVersion ||
-	//     this.settings.lastSeenVersion < "4.0.0"
-	//   ) {
-	//     const modal = new UpdateModal(this.app, async () => {
-	//       // Save current version after modal is closed
-	//       this.settings.lastSeenVersion = this.manifest.version;
-	//       await this.saveSettings();
-	//     });
-	//     modal.open();
-	//   }
-	// }
 }
 
 class FlowershowSettingTab extends PluginSettingTab {
