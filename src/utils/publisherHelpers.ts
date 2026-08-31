@@ -63,25 +63,6 @@ export function matchesExcludePatterns(
   });
 }
 
-export function isPlainTextExtension(ext: string): boolean {
-  const plainTextExtensions = [
-    "md",
-    "mdx",
-    "txt",
-    "json",
-    "yaml",
-    "yml",
-    "css",
-    "js",
-    "ts",
-    "html",
-    "xml",
-    "csv",
-    "tsv",
-  ];
-  return plainTextExtensions.includes(ext.toLowerCase());
-}
-
 /** Check if a file has publish: false in frontmatter */
 export function hasPublishFalse(file: TFile, app: App): boolean {
   if (file.extension !== "md" && file.extension !== "mdx") {
