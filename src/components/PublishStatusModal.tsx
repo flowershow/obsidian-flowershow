@@ -459,6 +459,11 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
 							{publisher.getSiteName()}
 						</a>
 					</p>
+					{publishStatus?.siteNotFoundMessage && (
+						<p style={{ margin: "4px 0 0", color: "var(--text-error)" }}>
+							⚠️ {publishStatus.siteNotFoundMessage}
+						</p>
+					)}
 				</div>
 				<div style={{ display: "flex", alignItems: "center" }}>
 					<button

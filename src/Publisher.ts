@@ -13,6 +13,8 @@ import {
   validatePublishFrontmatter,
   rewriteRootDirPaths,
   rewriteCanvasPaths,
+  normalizeSiteName,
+  siteNotFoundMessage,
 } from "./utils/publisherHelpers";
 
 export interface PublishStatus {
@@ -20,6 +22,8 @@ export interface PublishStatus {
   changedFiles: Array<TFile>;
   newFiles: Array<TFile>;
   deletedFiles: Array<string>;
+  /** Set when the configured site doesn't exist on Flowershow */
+  siteNotFoundMessage?: string;
 }
 
 export type PathToHashDict = { [key: string]: string };
@@ -39,7 +43,7 @@ export default class Publisher {
 
   /** Get the explicitly configured site name */
   getSiteName(): string {
-    return this.settings.siteName;
+    return normalizeSiteName(this.settings.siteName);
   }
 
   /** Get username */
@@ -86,7 +90,7 @@ export default class Publisher {
     }
 
     throw new FlowershowError(
-      `Site "${this.getSiteName()}" was not found. Create it on Flowershow first, then set "Site Name" to the exact same name.`,
+      siteNotFoundMessage(this.getSiteName()),
     );
   }
 
@@ -414,7 +418,13 @@ export default class Publisher {
           newFiles.push(file);
         }
       }
-      return { unchangedFiles, changedFiles, deletedFiles, newFiles };
+      return {
+        unchangedFiles,
+        changedFiles,
+        deletedFiles,
+        newFiles,
+        siteNotFoundMessage: siteNotFoundMessage(this.getSiteName()),
+      };
     }
 
     // Site exists, get status from server using dry-run mode
