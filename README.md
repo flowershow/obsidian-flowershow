@@ -47,7 +47,7 @@ The Flowershow icon in your ribbon opens the Publication Status panel, which sho
 #### Flowershow Authentication
 
 - **Personal Access Token**: Your Flowershow PAT token (starts with `fs_pat_`). Generate one at https://cloud.flowershow.app/tokens.
-- **Site Name**: The name for your Flowershow site.
+- **Site Name**: The name of an existing Flowershow site, exactly as shown in your Flowershow dashboard (e.g. `my-notes`, case-sensitive). Not the site's URL or custom domain.
 
 #### Publishing Settings
 

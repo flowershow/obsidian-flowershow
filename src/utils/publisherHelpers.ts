@@ -282,3 +282,36 @@ export function rewriteBaseQueryPaths(content: string, rootDir: string): string 
     },
   );
 }
+
+/**
+ * Normalize the configured Site Name (trim surrounding whitespace).
+ */
+export function normalizeSiteName(siteName: string): string {
+  return (siteName ?? "").trim();
+}
+
+/**
+ * Build the API path used to look up a site by owner username and site name.
+ */
+export function buildSiteLookupPath(username: string, siteName: string): string {
+  return `/api/sites/${encodeURIComponent(username)}/${encodeURIComponent(normalizeSiteName(siteName))}`;
+}
+
+/**
+ * Whether a configured Site Name looks like a domain or URL rather than a site name.
+ */
+export function looksLikeUrlOrDomain(siteName: string): boolean {
+  const name = normalizeSiteName(siteName);
+  return /[./:]/.test(name) || /^http/i.test(name);
+}
+
+/**
+ * User-facing message for when the configured site can't be found.
+ */
+export function siteNotFoundMessage(siteName: string): string {
+  const name = normalizeSiteName(siteName);
+  if (looksLikeUrlOrDomain(name)) {
+    return `Site "${name}" was not found. "Site Name" must be the site's name from your Flowershow dashboard (e.g. "my-notes"), not its URL or custom domain.`;
+  }
+  return `Site "${name}" was not found. Create it on Flowershow first, then set "Site Name" to match the site's name in your Flowershow dashboard exactly (case-sensitive).`;
+}

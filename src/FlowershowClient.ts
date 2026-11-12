@@ -1,4 +1,5 @@
 import { type RequestUrlResponse, requestUrl } from "obsidian";
+import { buildSiteLookupPath } from "./utils/publisherHelpers";
 
 /**
  * FlowershowClient - API client for direct publishing to Flowershow
@@ -135,7 +136,7 @@ export class FlowershowClient {
     siteName: string,
   ): Promise<{ site: Site } | null> {
     const response = await this.apiRequest(
-      `/api/sites/${username}/${siteName}`,
+      buildSiteLookupPath(username, siteName),
     );
 
     if (response.status === 404) {

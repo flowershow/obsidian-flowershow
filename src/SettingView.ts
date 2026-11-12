@@ -138,14 +138,14 @@ export default class SettingView {
 		new Setting(this.settingsRootElement)
 			.setName("Site Name")
 			.setDesc(
-				"Name of an existing Flowershow site. Create the site on Flowershow first, then enter its exact name here.",
+				"Name of an existing Flowershow site, exactly as shown in your Flowershow dashboard (e.g. \"my-notes\"). Not the site's URL or custom domain.",
 			)
 			.addText((text) =>
 				text
 					.setPlaceholder("my-notes")
 					.setValue(this.settings.siteName)
 					.onChange(async (value) => {
-						this.settings.siteName = value;
+						this.settings.siteName = value.trim();
 						await this.saveSettings();
 					}),
 			);
