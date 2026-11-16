@@ -282,3 +282,38 @@ export function rewriteBaseQueryPaths(content: string, rootDir: string): string 
     },
   );
 }
+
+/** Per-request caps of the Flowershow /files API (see its publish-limits). */
+export const MAX_FILES_PER_REQUEST = 1000;
+export const MAX_BYTES_PER_REQUEST = 500 * 1024 * 1024;
+
+/**
+ * Split items into batches that each fit one /files request: at most
+ * MAX_FILES_PER_REQUEST items and MAX_BYTES_PER_REQUEST total bytes. An item
+ * bigger than the byte cap on its own still gets a batch (the server reports
+ * the per-file limit).
+ */
+export function batchForRequests<T>(
+  items: T[],
+  sizeOf: (item: T) => number = () => 0,
+): T[][] {
+  const batches: T[][] = [];
+  let batch: T[] = [];
+  let bytes = 0;
+  for (const item of items) {
+    const size = sizeOf(item);
+    if (
+      batch.length > 0 &&
+      (batch.length >= MAX_FILES_PER_REQUEST ||
+        bytes + size > MAX_BYTES_PER_REQUEST)
+    ) {
+      batches.push(batch);
+      batch = [];
+      bytes = 0;
+    }
+    batch.push(item);
+    bytes += size;
+  }
+  if (batch.length > 0) batches.push(batch);
+  return batches;
+}

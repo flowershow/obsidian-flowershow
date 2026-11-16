@@ -293,6 +293,7 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
 		React.useState<"loading" | "success" | "error">(
 			initialStatus ? "success" : "loading"
 		);
+	const [statusError, setStatusError] = React.useState<string | null>(null);
 	const [siteId, setSiteId] = React.useState<string | null>(initialSiteId);
 	const [selectedBySection, setSelectedBySection] = React.useState<
 		Record<"Changed" | "New" | "Deleted" | "Unchanged", string[]>
@@ -323,6 +324,7 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
 		//   setPublishStatusResponseStatus("loading");
 		// }
 		setPublishStatusResponseStatus("loading");
+		setStatusError(null);
 		try {
 			// Fetch site ID for the settings link
 			const id = await publisher.getSiteId();
@@ -334,6 +336,14 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
 			// Update the cache
 			onStatusUpdate(status, id);
 		} catch (e) {
+			// Drop stale status so nothing (e.g. Publish All) acts on it
+			setPublishStatus(null);
+			onStatusUpdate(null, siteId);
+			setStatusError(
+				e instanceof FlowershowError
+					? e.message
+					: "Couldn't check what changed. See console errors for more info."
+			);
 			setPublishStatusResponseStatus("error");
 			console.error("Failed to fetch publish status", e);
 		}
@@ -541,6 +551,11 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
           </div> */}
 			</div>
 
+			{statusError ? (
+				<p style={{ color: "var(--text-error)", padding: "0 10px" }}>
+					❌ {statusError}
+				</p>
+			) : (
 			<div style={{ opacity: isLoading ? 0.7 : 1 }}>
 				<Section
 					title="Changed"
@@ -595,6 +610,7 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
 					defaultCollapsed={true}
 				/>
 			</div>
+			)}
 		</div>
 	);
 };
