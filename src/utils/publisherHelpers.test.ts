@@ -14,6 +14,8 @@ import {
   rewriteFrontmatterPaths,
   rewriteRootDirPaths,
   rewriteCanvasPaths,
+  batchForRequests,
+  MAX_BYTES_PER_REQUEST,
 } from "./publisherHelpers";
 import { IFlowershowSettings } from "src/settings";
 import { App, TFile } from "obsidian";
@@ -870,5 +872,39 @@ describe("rewriteCanvasPaths", () => {
     const content = JSON.stringify({ edges: [] });
     const result = JSON.parse(rewriteCanvasPaths(content, "Public"));
     expect(result).toEqual({ edges: [] });
+  });
+});
+
+describe("batchForRequests", () => {
+  const MB = 1024 * 1024;
+  const range = (n: number) => Array.from({ length: n }, (_, i) => i);
+
+  it("keeps up to 1000 items in one batch", () => {
+    expect(batchForRequests(range(1000)).map((b) => b.length)).toEqual([1000]);
+  });
+
+  it("splits 7000 items into batches of 1000, in order", () => {
+    const batches = batchForRequests(range(7001));
+    expect(batches.map((b) => b.length)).toEqual([
+      1000, 1000, 1000, 1000, 1000, 1000, 1000, 1,
+    ]);
+    expect(batches.flat()).toEqual(range(7001));
+  });
+
+  it("starts a new batch before the total would exceed the byte cap", () => {
+    const sizes = [200 * MB, 200 * MB, 100 * MB, 1];
+    expect(batchForRequests(sizes, (s) => s)).toEqual([
+      [200 * MB, 200 * MB, 100 * MB],
+      [1],
+    ]);
+  });
+
+  it("gives an item over the byte cap a batch of its own", () => {
+    const big = MAX_BYTES_PER_REQUEST + 1;
+    expect(batchForRequests([1, big, 1], (s) => s)).toEqual([[1], [big], [1]]);
+  });
+
+  it("returns no batches for no items", () => {
+    expect(batchForRequests([])).toEqual([]);
   });
 });

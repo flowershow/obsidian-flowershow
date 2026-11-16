@@ -6,8 +6,13 @@ import {
   calculateTextSha,
   isPlainTextExtension,
 } from "./utils";
-import { FlowershowClient, FileMetadata } from "./FlowershowClient";
 import {
+  FlowershowClient,
+  FileMetadata,
+  SyncFilesResponse,
+} from "./FlowershowClient";
+import {
+  batchForRequests,
   normalizePath,
   shouldSkipFile,
   validatePublishFrontmatter,
@@ -258,42 +263,43 @@ export default class Publisher {
       // Handle file deletions first if any
       if (opts.filesToDelete && opts.filesToDelete.length > 0) {
         // Normalize paths before deletion
-        const normalizedPathsToDelete = opts.filesToDelete.map((path) =>
+        deletedPaths = opts.filesToDelete.map((path) =>
           normalizePath(path, this.settings.rootDir),
         );
-        deletedPaths = normalizedPathsToDelete;
 
-        const deleteResult = await this.client.deleteFiles(
-          siteId,
-          normalizedPathsToDelete,
-        );
+        const notFound: string[] = [];
+        for (const batch of batchForRequests(deletedPaths)) {
+          const deleteResult = await this.client.deleteFiles(siteId, batch);
+          notFound.push(...deleteResult.notFound);
+          done += batch.length;
+          progress.setMessage(`⌛ ${label} (${done}/${total})...`);
+        }
 
-        // Check if any files were not found
-        if (deleteResult.notFound.length > 0) {
+        if (notFound.length > 0) {
           throw new FlowershowError(
-            `Failed to delete ${
-              deleteResult.notFound.length
-            } file(s): ${deleteResult.notFound.join(
+            `Failed to delete ${notFound.length} file(s): ${notFound.join(
               ", ",
             )}. Files not found on server.`,
           );
         }
-
-        done += totalDelete;
-        progress.setMessage(`⌛ ${label} (${done}/${total})...`);
       }
 
-      // Handle file publishing
-      if (opts.filesToPublish && opts.filesToPublish.length > 0) {
-        // Prepare file metadata for selected files only
+      // Handle file publishing, in batches that fit the server's per-request
+      // caps (file count and total bytes)
+      const publishBatches = batchForRequests(
+        opts.filesToPublish ?? [],
+        (file) => file.stat.size,
+      );
+      for (const batch of publishBatches) {
         const fileMetadata: FileMetadata[] = [];
-        const filesToProcess = opts.filesToPublish;
+        const fileByPath = new Map<string, TFile>();
 
-        for (const file of filesToProcess) {
+        for (const file of batch) {
           const normalizedPath = normalizePath(
             file.path,
             this.settings.rootDir,
           );
+          fileByPath.set(normalizedPath, file);
 
           // Calculate SHA
           let sha: string;
@@ -320,10 +326,7 @@ export default class Publisher {
 
         // Upload files to R2
         for (const uploadInfo of publishResult.files) {
-          const file = filesToProcess.find(
-            (f) =>
-              normalizePath(f.path, this.settings.rootDir) === uploadInfo.path,
-          );
+          const file = fileByPath.get(uploadInfo.path);
           if (!file) continue;
 
           let content: ArrayBuffer | Uint8Array;
@@ -421,90 +424,67 @@ export default class Publisher {
     const siteId = existingSite.site.id;
     this.siteId = siteId; // Cache it
 
-    try {
-      // Get local files
-      const localFiles = this.app.vault.getFiles();
-      const fileMetadata: FileMetadata[] = [];
-
-      for (const file of localFiles) {
-        if (
-          shouldSkipFile(
-            file,
-            this.app,
-            this.settings.rootDir,
-            this.settings.excludePatterns,
-          )
-        ) {
-          continue;
-        }
-
-        const normalizedPath = normalizePath(file.path, this.settings.rootDir);
-
-        let sha: string;
-        if (this.isTextFile(file)) {
-          const text = await this.getTextContent(file);
-          sha = await calculateTextSha(text);
-        } else {
-          const bytes = await this.app.vault.readBinary(file);
-          sha = await calculateFileSha(bytes);
-        }
-
-        fileMetadata.push({
-          path: normalizedPath,
-          size: file.stat.size,
-          sha,
-        });
-      }
-
-      // Use dry-run mode to see what would change without making any changes
-      const syncResult = await this.client.syncFiles(
-        siteId,
-        fileMetadata,
-        true,
-      );
-
-      // Categorize files
-      for (const file of localFiles) {
-        if (
-          shouldSkipFile(
-            file,
-            this.app,
-            this.settings.rootDir,
-            this.settings.excludePatterns,
-          )
-        ) {
-          continue;
-        }
-
-        const normalizedPath = normalizePath(file.path, this.settings.rootDir);
-
-        if (syncResult.unchanged.includes(normalizedPath)) {
-          unchangedFiles.push(file);
-        } else if (syncResult.toUpdate.some((u) => u.path === normalizedPath)) {
-          changedFiles.push(file);
-        } else if (syncResult.toUpload.some((u) => u.path === normalizedPath)) {
-          newFiles.push(file);
-        }
-      }
-
-      deletedFiles.push(...syncResult.deleted);
-    } catch (error) {
-      console.error("Error getting publish status:", error);
-      // On error, treat all files as new
-      const errorLocalFiles = this.app.vault.getFiles();
-      for (const file of errorLocalFiles) {
-        if (
+    const localFiles = this.app.vault
+      .getFiles()
+      .filter(
+        (file) =>
           !shouldSkipFile(
             file,
             this.app,
             this.settings.rootDir,
             this.settings.excludePatterns,
-          )
-        ) {
-          newFiles.push(file);
-        }
+          ),
+      );
+    const fileMetadata: FileMetadata[] = [];
+
+    for (const file of localFiles) {
+      let sha: string;
+      if (this.isTextFile(file)) {
+        const text = await this.getTextContent(file);
+        sha = await calculateTextSha(text);
+      } else {
+        const bytes = await this.app.vault.readBinary(file);
+        sha = await calculateFileSha(bytes);
       }
+
+      fileMetadata.push({
+        path: normalizePath(file.path, this.settings.rootDir),
+        size: file.stat.size,
+        sha,
+      });
     }
+
+    // Use dry-run mode to see what would change without making any changes.
+    // A failure must surface: guessing "everything is new" would offer to
+    // re-upload the whole vault.
+    let syncResult: SyncFilesResponse;
+    try {
+      syncResult = await this.client.syncFiles(siteId, fileMetadata, true);
+    } catch (error) {
+      console.error("Error getting publish status:", error);
+      throw new FlowershowError(
+        `Couldn't check what changed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
+    // Categorize files (Sets: vaults can have thousands of files)
+    const unchanged = new Set(syncResult.unchanged);
+    const toUpdate = new Set(syncResult.toUpdate.map((u) => u.path));
+    const toUpload = new Set(syncResult.toUpload.map((u) => u.path));
+    localFiles.forEach((file, i) => {
+      const { path } = fileMetadata[i];
+      if (unchanged.has(path)) {
+        unchangedFiles.push(file);
+      } else if (toUpdate.has(path)) {
+        changedFiles.push(file);
+      } else if (toUpload.has(path)) {
+        newFiles.push(file);
+      }
+    });
+
+    deletedFiles.push(...syncResult.deleted);
 
     return { unchangedFiles, changedFiles, deletedFiles, newFiles };
   }
