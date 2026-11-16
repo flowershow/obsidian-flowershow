@@ -283,7 +283,8 @@ export function rewriteBaseQueryPaths(content: string, rootDir: string): string 
   );
 }
 
-/** Per-request caps of the Flowershow /files API (see its publish-limits). */
+/** Caps of the Flowershow /files API (see its publish-limits). */
+export const MAX_FILE_SIZE = 100 * 1024 * 1024;
 export const MAX_FILES_PER_REQUEST = 1000;
 export const MAX_BYTES_PER_REQUEST = 500 * 1024 * 1024;
 
