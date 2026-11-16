@@ -13,6 +13,7 @@ import {
 } from "./FlowershowClient";
 import {
   batchForRequests,
+  MAX_FILE_SIZE,
   normalizePath,
   shouldSkipFile,
   validatePublishFrontmatter,
@@ -244,10 +245,24 @@ export default class Publisher {
       throw new FlowershowError("No files to delete or publish provided");
     }
 
+    // Reject oversize files before any request, so a publish never stops
+    // half-way on a batch the server refuses
+    const tooLarge = (opts.filesToPublish ?? []).filter(
+      (file) => file.stat.size > MAX_FILE_SIZE,
+    );
+    if (tooLarge.length > 0) {
+      throw new FlowershowError(
+        `Files over the ${MAX_FILE_SIZE / 1024 / 1024} MB limit can't be published: ${tooLarge
+          .map((file) => file.path)
+          .join(", ")}. Exclude them and try again.`,
+      );
+    }
+
     const totalPublish = opts.filesToPublish?.length ?? 0;
     const totalDelete = opts.filesToDelete?.length ?? 0;
     const total = totalPublish + totalDelete;
     let done = 0;
+    let published = 0;
 
     const label = totalPublish > 0 ? "Publishing" : "Unpublishing";
     const progress = new Notice(`⌛ ${label} (0/${total})...`, 0);
@@ -346,6 +361,7 @@ export default class Publisher {
           );
 
           done++;
+          published++;
           progress.setMessage(`⌛ ${label} (${done}/${total})...`);
         }
       }
@@ -384,6 +400,14 @@ export default class Publisher {
       };
     } catch (error) {
       progress.hide();
+      // Earlier batches are already live: say how far the publish got
+      if (published > 0 && published < totalPublish) {
+        throw new FlowershowError(
+          `Published ${published} of ${totalPublish} files, then: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
       throw error;
     }
   }

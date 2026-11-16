@@ -494,10 +494,10 @@ const PublishStatusModalContent: React.FC<PublishStatusModalContentProps> = ({
 									})
 							);
 						}}
-						disabled={isDisabled}
+						disabled={isDisabled || !publishStatus}
 						style={{
 							marginRight: "8px",
-							cursor: isDisabled ? "default" : "pointer",
+							cursor: isDisabled || !publishStatus ? "default" : "pointer",
 						}}
 					>
 						Publish All
