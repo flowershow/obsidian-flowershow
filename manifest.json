@@ -1,7 +1,7 @@
 {
 	"id": "flowershow",
 	"name": "Publish with Flowershow",
-	"version": "4.2.3",
+	"version": "4.2.4",
 	"minAppVersion": "0.15.0",
 	"description": "Publish your vault as a website with Flowershow.",
 	"author": "Flowershow",
