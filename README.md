@@ -13,9 +13,10 @@ Here is how you can publish your Obsidian vault with Flowershow:
 3. Search for "Flowershow" and click Install.
 4. Enable the plugin once installed.
 
-**STEP 2: Sign Up for Flowershow Cloud**
+**STEP 2: Sign Up and Create a Site**
 
 1. Sign up for a free account at https://cloud.flowershow.app/login.
+2. In the dashboard, click **New Site** and pick a name, e.g. `my-notes`. The plugin publishes to an existing site; it does not create one.
 
 **STEP 3: Generate a Personal Access Token**
 
@@ -26,7 +27,7 @@ Here is how you can publish your Obsidian vault with Flowershow:
 **STEP 4: Configure the Plugin & Publish**
 
 1. Go back to Obsidian and open the Flowershow plugin settings.
-2. Enter your Flowershow PAT token and choose a site name.
+2. Enter your Flowershow PAT token, and set **Site Name** to your site's name exactly as it appears in the dashboard (e.g. `my-notes`, not its URL).
 3. Use "Flowershow" commands or click on the Flowershow icon in the ribbon and select the notes to publish — and that's it!
 
 **That's it! Your notes are now ready to be shared with the world! 💐**
@@ -47,7 +48,7 @@ The Flowershow icon in your ribbon opens the Publication Status panel, which sho
 #### Flowershow Authentication
 
 - **Personal Access Token**: Your Flowershow PAT token (starts with `fs_pat_`). Generate one at https://cloud.flowershow.app/tokens.
-- **Site Name**: The name for your Flowershow site.
+- **Site Name**: The name of an existing Flowershow site, exactly as shown in your dashboard (e.g. `my-notes`). Not the site's URL or custom domain.
 
 #### Publishing Settings
 
